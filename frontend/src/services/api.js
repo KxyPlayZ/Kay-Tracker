@@ -1,4 +1,3 @@
-// frontend/src/services/api.js
 import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
@@ -10,7 +9,6 @@ const api = axios.create({
   },
 });
 
-// Request Interceptor - Token zu jedem Request hinzufügen
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
@@ -24,7 +22,6 @@ api.interceptors.request.use(
   }
 );
 
-// Response Interceptor - Bei 401 zum Login weiterleiten
 api.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -37,14 +34,12 @@ api.interceptors.response.use(
   }
 );
 
-// Auth API
 export const authAPI = {
   register: (data) => api.post('/auth/register', data),
   login: (data) => api.post('/auth/login', data),
   getProfile: () => api.get('/auth/profile'),
 };
 
-// Depot API
 export const depotAPI = {
   getAll: () => api.get('/depots'),
   getOne: (id) => api.get(`/depots/${id}`),
@@ -52,12 +47,11 @@ export const depotAPI = {
   update: (id, data) => api.put(`/depots/${id}`, data),
   delete: (id) => api.delete(`/depots/${id}`),
   getStats: (id) => api.get(`/depots/${id}/stats`),
-  clearDepotData: (id) => api.delete(`/depots/${id}/clear`),        // NEU
-  clearAllUserData: () => api.delete('/depots/clear-all/user-data'), // NEU
+  clearDepotData: (id) => api.delete(`/depots/${id}/clear`),
+  clearAllUserData: () => api.delete('/depots/clear-all/user-data'),
   getTradeHistory: (depotId) => api.get(`/aktien/history/depot/${depotId}`),
 };
 
-// Aktien API
 export const aktienAPI = {
   getAll: () => api.get('/aktien'),
   getByDepot: (depotId) => api.get(`/aktien/depot/${depotId}`),
@@ -68,13 +62,13 @@ export const aktienAPI = {
   import: (data) => api.post('/aktien/import', data),
 };
 
-// Transaction API
 export const transactionAPI = {
   buy: (data) => api.post('/transactions/buy', data),
   sell: (data) => api.post('/transactions/sell', data),
   getTransactions: (aktieId) => api.get(`/transactions/${aktieId}`),
   getDepotTimeline: (depotId) => api.get(`/transactions/timeline/depot/${depotId}`),
   getUserTimeline: () => api.get('/transactions/timeline/user'),
+  deleteTransaction: (transactionId) => api.delete(`/transactions/${transactionId}`),
 };
 
 export default api;

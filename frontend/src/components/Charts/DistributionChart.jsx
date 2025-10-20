@@ -1,6 +1,5 @@
-// frontend/src/components/Charts/DistributionChart.jsx
 import React from 'react';
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 const DistributionChart = ({ data, darkMode }) => {
   const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
@@ -8,7 +7,7 @@ const DistributionChart = ({ data, darkMode }) => {
   if (!data || data.length === 0) {
     return (
       <div className="flex items-center justify-center h-64 text-gray-500">
-        Keine Daten verfügbar
+        Keine Daten verfuegbar
       </div>
     );
   }
@@ -21,17 +20,18 @@ const DistributionChart = ({ data, darkMode }) => {
             data={data}
             cx="50%"
             cy="50%"
+            labelLine={false}
             outerRadius={100}
             fill="#8884d8"
             dataKey="value"
-            label={({ percentage }) => `${percentage}%`}
+            label={({ name, percentage }) => `${name}: ${percentage}%`}
           >
             {data.map((entry, index) => (
               <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
             ))}
           </Pie>
           <Tooltip 
-            formatter={(value) => `€${value.toLocaleString('de-DE', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`}
+            formatter={(value) => `${value.toFixed(2)} EUR`}
             contentStyle={{ 
               backgroundColor: darkMode ? '#1f2937' : '#fff',
               border: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
@@ -49,7 +49,8 @@ const DistributionChart = ({ data, darkMode }) => {
               style={{ backgroundColor: COLORS[index % COLORS.length] }}
             />
             <span className="flex-1">{item.name}</span>
-            <span className="font-semibold">{item.percentage}%</span>
+            <span className="font-semibold">{item.value.toFixed(2)} EUR</span>
+            <span className="text-gray-500">({item.percentage}%)</span>
           </div>
         ))}
       </div>

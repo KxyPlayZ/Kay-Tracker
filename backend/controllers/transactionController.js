@@ -8,12 +8,10 @@ exports.buyAktie = async (req, res) => {
   try {
     const { depot_id, name, symbol, shares, price, category, transaction_date } = req.body;
 
-    // Validierung
     if (!depot_id || !name || !symbol || !shares || !price) {
       return res.status(400).json({ error: 'Alle Felder sind erforderlich' });
     }
 
-    // PrÃ¼fen ob Depot dem User gehÃ¶rt
     const depotCheck = await client.query(
       'SELECT * FROM depots WHERE id = $1 AND user_id = $2',
       [depot_id, req.userId]
@@ -25,7 +23,6 @@ exports.buyAktie = async (req, res) => {
 
     await client.query('BEGIN');
 
-    // PrÃ¼fen ob Aktie bereits existiert
     const existingAktie = await client.query(
       'SELECT * FROM aktien WHERE depot_id = $1 AND symbol = $2',
       [depot_id, symbol]
@@ -33,7 +30,6 @@ exports.buyAktie = async (req, res) => {
 
     let aktie;
     if (existingAktie.rows.length > 0) {
-      // Aktie existiert - Menge erhÃ¶hen
       const existing = existingAktie.rows[0];
       const newShares = parseFloat(existing.current_shares || existing.shares) + parseFloat(shares);
 
@@ -49,7 +45,6 @@ exports.buyAktie = async (req, res) => {
       
       aktie = updateResult.rows[0];
     } else {
-      // Neue Aktie erstellen
       const insertResult = await client.query(
         `INSERT INTO aktien (depot_id, name, symbol, shares, current_shares, buy_price, current_price, category) 
          VALUES ($1, $2, $3, $4, $4, $5, $5, $6) 
@@ -60,7 +55,6 @@ exports.buyAktie = async (req, res) => {
       aktie = insertResult.rows[0];
     }
 
-    // Transaction eintragen mit optional angegebenem Datum
     const timestamp = transaction_date ? new Date(transaction_date) : new Date();
     await client.query(
       'INSERT INTO transactions (aktie_id, type, shares, price, transaction_timestamp) VALUES ($1, $2, $3, $4, $5)',
@@ -94,7 +88,6 @@ exports.sellAktie = async (req, res) => {
       return res.status(400).json({ error: 'Alle Felder sind erforderlich' });
     }
 
-    // Aktie holen und prÃ¼fen
     const aktieResult = await client.query(
       `SELECT a.*, d.user_id 
        FROM aktien a 
@@ -124,27 +117,22 @@ exports.sellAktie = async (req, res) => {
 
     await client.query('BEGIN');
 
-    // Gewinn berechnen
     const gewinn = (parseFloat(price) - parseFloat(aktie.buy_price)) * sellShares;
 
-    // Transaction ZUERST eintragen mit optionalem Datum
     const timestamp = transaction_date ? new Date(transaction_date) : new Date();
     await client.query(
       'INSERT INTO transactions (aktie_id, type, shares, price, transaction_timestamp) VALUES ($1, $2, $3, $4, $5)',
       [aktie_id, 'SELL', sellShares, price, timestamp]
     );
 
-    // Aktien reduzieren
     const newShares = currentShares - sellShares;
     
     if (newShares === 0) {
-      // Alle verkauft - current_shares auf 0 setzen aber Aktie behalten fÃ¼r Historie
       await client.query(
         'UPDATE aktien SET current_shares = 0, current_price = $1 WHERE id = $2',
         [price, aktie_id]
       );
     } else {
-      // Teilverkauf - Menge reduzieren
       await client.query(
         'UPDATE aktien SET current_shares = $1, current_price = $2 WHERE id = $3',
         [newShares, price, aktie_id]
@@ -173,7 +161,6 @@ exports.getTransactions = async (req, res) => {
   try {
     const { aktieId } = req.params;
 
-    // PrÃ¼fen ob Aktie dem User gehÃ¶rt
     const aktieCheck = await pool.query(
       `SELECT a.* FROM aktien a 
        JOIN depots d ON a.depot_id = d.id 
@@ -197,12 +184,11 @@ exports.getTransactions = async (req, res) => {
   }
 };
 
-// Performance-Timeline fÃ¼r Charts
+// Performance-Timeline für Charts (einzelnes Depot)
 exports.getPerformanceTimeline = async (req, res) => {
   try {
     const { depotId } = req.params;
 
-    // PrÃ¼fen ob Depot dem User gehÃ¶rt
     const depotCheck = await pool.query(
       'SELECT * FROM depots WHERE id = $1 AND user_id = $2',
       [depotId, req.userId]
@@ -212,7 +198,6 @@ exports.getPerformanceTimeline = async (req, res) => {
       return res.status(404).json({ error: 'Depot nicht gefunden' });
     }
 
-    // Alle Transaktionen des Depots mit Gewinn-Berechnung
     const result = await pool.query(
       `SELECT 
         t.*,
@@ -227,7 +212,6 @@ exports.getPerformanceTimeline = async (req, res) => {
       [depotId]
     );
 
-    // Kumulativen Gewinn berechnen
     let kumulativerGewinn = 0;
     const timeline = result.rows.map(row => {
       const gewinnVerlust = parseFloat(row.gewinn_verlust || 0);
@@ -254,10 +238,9 @@ exports.getPerformanceTimeline = async (req, res) => {
   }
 };
 
-// Gesamte Performance fÃ¼r User
+// Gesamte Performance für User (alle Depots)
 exports.getUserPerformanceTimeline = async (req, res) => {
   try {
-    // Alle Transaktionen des Users
     const result = await pool.query(
       `SELECT 
         t.*,
@@ -274,7 +257,6 @@ exports.getUserPerformanceTimeline = async (req, res) => {
       [req.userId]
     );
 
-    // Kumulativen Gewinn berechnen
     let kumulativerGewinn = 0;
     const timeline = result.rows.map(row => {
       const gewinnVerlust = parseFloat(row.gewinn_verlust || 0);
@@ -299,5 +281,86 @@ exports.getUserPerformanceTimeline = async (req, res) => {
   } catch (error) {
     console.error('Fehler beim Abrufen der User Timeline:', error);
     res.status(500).json({ error: 'Serverfehler' });
+  }
+};
+
+// Transaction löschen
+exports.deleteTransaction = async (req, res) => {
+  const client = await pool.connect();
+  
+  try {
+    const { transactionId } = req.params;
+
+    const checkResult = await client.query(
+      `SELECT t.*, a.depot_id, d.user_id 
+       FROM transactions t
+       JOIN aktien a ON t.aktie_id = a.id
+       JOIN depots d ON a.depot_id = d.id
+       WHERE t.id = $1`,
+      [transactionId]
+    );
+
+    if (checkResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Transaktion nicht gefunden' });
+    }
+
+    const transaction = checkResult.rows[0];
+
+    if (transaction.user_id !== req.userId) {
+      return res.status(403).json({ error: 'Keine Berechtigung' });
+    }
+
+    await client.query('BEGIN');
+
+    const aktieResult = await client.query(
+      'SELECT * FROM aktien WHERE id = $1',
+      [transaction.aktie_id]
+    );
+
+    if (aktieResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Aktie nicht gefunden' });
+    }
+
+    const aktie = aktieResult.rows[0];
+    const currentShares = parseFloat(aktie.current_shares || aktie.shares);
+    const transactionShares = parseFloat(transaction.shares);
+
+    let newShares;
+    if (transaction.type === 'BUY') {
+      newShares = currentShares - transactionShares;
+    } else {
+      newShares = currentShares + transactionShares;
+    }
+
+    if (newShares < 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ 
+        error: 'Transaktion kann nicht gelöscht werden: Würde zu negativen Shares führen' 
+      });
+    }
+
+    await client.query(
+      'UPDATE aktien SET current_shares = $1 WHERE id = $2',
+      [newShares, transaction.aktie_id]
+    );
+
+    await client.query(
+      'DELETE FROM transactions WHERE id = $1',
+      [transactionId]
+    );
+
+    await client.query('COMMIT');
+
+    res.json({ 
+      message: 'Transaktion erfolgreich gelöscht',
+      new_shares: newShares
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Fehler beim Löschen der Transaktion:', error);
+    res.status(500).json({ error: 'Serverfehler' });
+  } finally {
+    client.release();
   }
 };

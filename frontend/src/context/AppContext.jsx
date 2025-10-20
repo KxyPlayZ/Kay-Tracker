@@ -1,5 +1,4 @@
-// frontend/src/context/AppContext.jsx
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import { depotAPI, aktienAPI, transactionAPI } from '../services/api';
 
 const AppContext = createContext();
@@ -18,6 +17,7 @@ export const AppProvider = ({ children }) => {
   const [depots, setDepots] = useState([]);
   const [aktien, setAktien] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [performanceTimeline, setPerformanceTimeline] = useState([]);
 
   // User aus localStorage laden
   useEffect(() => {
@@ -35,15 +35,17 @@ export const AppProvider = ({ children }) => {
   // Dark Mode aus localStorage laden
   useEffect(() => {
     const savedMode = localStorage.getItem('darkMode');
-    if (savedMode) {
+    if (savedMode !== null) {
       setDarkMode(JSON.parse(savedMode));
     }
   }, []);
 
   // Dark Mode in localStorage speichern
   useEffect(() => {
-    localStorage.setItem('darkMode', JSON.stringify(darkMode));
-  }, [darkMode]);
+    if (user) {
+      localStorage.setItem('darkMode', JSON.stringify(darkMode));
+    }
+  }, [darkMode, user]);
 
   // Daten laden
   const loadData = async () => {
@@ -80,14 +82,14 @@ export const AppProvider = ({ children }) => {
     localStorage.removeItem('token');
   };
 
-  // Depot hinzufÃ¼gen
+  // Depot hinzufügen
   const addDepot = async (depotData) => {
     try {
       const response = await depotAPI.create(depotData);
       setDepots([...depots, response.data.depot]);
       return response.data.depot;
     } catch (error) {
-      console.error('Fehler beim HinzufÃ¼gen des Depots:', error);
+      console.error('Fehler beim Hinzufügen des Depots:', error);
       throw error;
     }
   };
@@ -104,26 +106,26 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  // Depot lÃ¶schen
+  // Depot löschen
   const deleteDepot = async (id) => {
     try {
       await depotAPI.delete(id);
       setDepots(depots.filter(d => d.id !== id));
       setAktien(aktien.filter(a => a.depot_id !== id));
     } catch (error) {
-      console.error('Fehler beim LÃ¶schen des Depots:', error);
+      console.error('Fehler beim Löschen des Depots:', error);
       throw error;
     }
   };
 
-  // Aktie hinzufÃ¼gen
+  // Aktie hinzufügen
   const addAktie = async (aktieData) => {
     try {
       const response = await aktienAPI.create(aktieData);
       setAktien([...aktien, response.data.aktie]);
       return response.data.aktie;
     } catch (error) {
-      console.error('Fehler beim HinzufÃ¼gen der Aktie:', error);
+      console.error('Fehler beim Hinzufügen der Aktie:', error);
       throw error;
     }
   };
@@ -140,13 +142,13 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  // Aktie lÃ¶schen
+  // Aktie löschen
   const deleteAktie = async (id) => {
     try {
       await aktienAPI.delete(id);
       setAktien(aktien.filter(a => a.id !== id));
     } catch (error) {
-      console.error('Fehler beim LÃ¶schen der Aktie:', error);
+      console.error('Fehler beim Löschen der Aktie:', error);
       throw error;
     }
   };
@@ -155,7 +157,7 @@ export const AppProvider = ({ children }) => {
   const importAktien = async (depotId, aktienList) => {
     try {
       const response = await aktienAPI.import({ depot_id: depotId, aktien: aktienList });
-      await loadData(); // Neu laden nach Import
+      await loadData();
       return response.data;
     } catch (error) {
       console.error('Fehler beim Importieren der Aktien:', error);
@@ -163,11 +165,11 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-// Aktie kaufen
+  // Aktie kaufen
   const buyAktie = async (buyData) => {
     try {
       const response = await transactionAPI.buy(buyData);
-      await loadData(); // Daten neu laden
+      await loadData();
       return response.data;
     } catch (error) {
       console.error('Fehler beim Kauf:', error);
@@ -179,7 +181,7 @@ export const AppProvider = ({ children }) => {
   const sellAktie = async (sellData) => {
     try {
       const response = await transactionAPI.sell(sellData);
-      await loadData(); // Daten neu laden
+      await loadData();
       return response.data;
     } catch (error) {
       console.error('Fehler beim Verkauf:', error);
@@ -187,34 +189,32 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-// Depot-Daten lÃ¶schen (nur Aktien)
+  // Depot-Daten löschen (nur Aktien)
   const clearDepotData = async (depotId) => {
     try {
       const response = await depotAPI.clearDepotData(depotId);
       await loadData();
       return response.data;
     } catch (error) {
-      console.error('Fehler beim LÃ¶schen der Depot-Daten:', error);
+      console.error('Fehler beim Löschen der Depot-Daten:', error);
       throw error;
     }
   };
 
-  // Alle Daten lÃ¶schen (auÃŸer Account)
+  // Alle Daten löschen (außer Account)
   const clearAllUserData = async () => {
     try {
       const response = await depotAPI.clearAllUserData();
       await loadData();
       return response.data;
     } catch (error) {
-      console.error('Fehler beim LÃ¶schen aller Daten:', error);
+      console.error('Fehler beim Löschen aller Daten:', error);
       throw error;
     }
   };
 
-// Timeline Daten laden
-  const [performanceTimeline, setPerformanceTimeline] = useState([]);
-
-  const loadUserTimeline = async () => {
+  // Timeline Daten laden - MIT useCallback um Infinite Loop zu vermeiden
+  const loadUserTimeline = useCallback(async () => {
     try {
       const response = await transactionAPI.getUserTimeline();
       setPerformanceTimeline(response.data);
@@ -223,9 +223,9 @@ export const AppProvider = ({ children }) => {
       console.error('Fehler beim Laden der Timeline:', error);
       return [];
     }
-  };
+  }, []); // Keine Dependencies - wird nur einmal erstellt
 
-  const loadDepotTimeline = async (depotId) => {
+  const loadDepotTimeline = useCallback(async (depotId) => {
     try {
       const response = await transactionAPI.getDepotTimeline(depotId);
       return response.data;
@@ -233,7 +233,7 @@ export const AppProvider = ({ children }) => {
       console.error('Fehler beim Laden der Depot-Timeline:', error);
       return [];
     }
-  };
+  }, []); // Keine Dependencies - wird nur einmal erstellt
 
   const value = {
     darkMode,
@@ -242,7 +242,7 @@ export const AppProvider = ({ children }) => {
     depots,
     aktien,
     loading,
-    performanceTimeline, 
+    performanceTimeline,
     login,
     logout,
     addDepot,
@@ -252,12 +252,12 @@ export const AppProvider = ({ children }) => {
     updateAktie,
     deleteAktie,
     importAktien,
-    buyAktie,     
-    sellAktie,  
-    clearDepotData,      // NEU
-    clearAllUserData,    // NEU 
-    loadUserTimeline,            // NEU
-    loadDepotTimeline,   
+    buyAktie,
+    sellAktie,
+    clearDepotData,
+    clearAllUserData,
+    loadUserTimeline,
+    loadDepotTimeline,
     loadData
   };
 
