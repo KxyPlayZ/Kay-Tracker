@@ -10,17 +10,19 @@ router.use(authMiddleware);
 router.get('/', aktienController.getAllAktien);
 router.get('/depot/:depotId', aktienController.getAktienByDepot);
 router.get('/history/depot/:depotId', aktienController.getTradeHistory);
-router.get('/:id', aktienController.getAktie);  // ← Am Ende der GET Routen
+router.get('/:id', aktienController.getAktie);
 
 // POST Routen
 router.post('/', aktienController.createAktie);
 router.post('/import', aktienController.importAktien);
 router.post('/import/justtrade', aktienController.importJustTradeCSV);
+// TEMPORÄR AUSKOMMENTIERT
+// router.post('/update-from-isin-mapping', aktienController.updateAllStocksFromISINMapping);
 
-// PUT Routen - WICHTIG: Spezifische Routen VOR /:id!
-router.put('/prices/:depot_id', aktienController.updatePrices);        // ← VOR /:id
-router.put('/refresh/:id', aktienController.refreshSinglePrice);       // ← VOR /:id
-router.put('/:id', aktienController.updateAktie);                      // ← Am Ende
+// PUT Routen
+router.put('/prices/:depot_id', aktienController.updatePrices);
+router.put('/refresh/:id', aktienController.refreshSinglePrice);
+router.put('/:id', aktienController.updateAktie);
 
 // DELETE Routen
 router.delete('/:id', aktienController.deleteAktie);

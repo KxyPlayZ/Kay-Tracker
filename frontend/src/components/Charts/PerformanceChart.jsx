@@ -1,3 +1,5 @@
+// frontend/src/components/Charts/PerformanceChart.jsx
+// Punkt 4: Chart vergrößert auf 400px Höhe statt 250px
 import React, { useEffect, useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useApp } from '../../context/AppContext';
@@ -54,7 +56,7 @@ const PerformanceChart = ({ darkMode, color = '#3b82f6', depotId = null }) => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex items-center justify-center h-96">
         <p className={`text-lg ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
           Lädt...
         </p>
@@ -64,7 +66,7 @@ const PerformanceChart = ({ darkMode, color = '#3b82f6', depotId = null }) => {
 
   if (!chartData || chartData.length === 0) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex items-center justify-center h-96">
         <div className="text-center">
           <p className={`text-lg ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
             Keine Performance-Daten vorhanden
@@ -78,34 +80,36 @@ const PerformanceChart = ({ darkMode, color = '#3b82f6', depotId = null }) => {
   }
 
   return (
-    <ResponsiveContainer width="100%" height={250}>
+    <ResponsiveContainer width="100%" height={400}>
       <LineChart data={chartData}>
         <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
         <XAxis 
           dataKey="date" 
           stroke={darkMode ? '#9ca3af' : '#6b7280'}
-          style={{ fontSize: '11px' }}
+          style={{ fontSize: '12px' }}
         />
         <YAxis 
           stroke={darkMode ? '#9ca3af' : '#6b7280'}
-          style={{ fontSize: '12px' }}
-          tickFormatter={(value) => `${value.toFixed(0)}`}
+          style={{ fontSize: '13px' }}
+          tickFormatter={(value) => `€${value.toFixed(0)}`}
         />
         <Tooltip 
           contentStyle={{ 
-            backgroundColor: darkMode ? '#1f2937' : '#fff',
+            backgroundColor: darkMode ? '#1f2937' : '#ffffff',
             border: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
-            borderRadius: '8px'
+            borderRadius: '8px',
+            fontSize: '14px'
           }}
-          formatter={(value) => [`${value.toFixed(2)} EUR`, 'Kumulativer Gewinn']}
+          formatter={(value) => [`€${value.toFixed(2)}`, 'Gewinn']}
+          labelStyle={{ color: darkMode ? '#9ca3af' : '#6b7280' }}
         />
         <Line 
           type="monotone" 
           dataKey="value" 
           stroke={color} 
-          strokeWidth={2}
+          strokeWidth={3}
           dot={false}
-          activeDot={{ r: 4 }}
+          activeDot={{ r: 6 }}
         />
       </LineChart>
     </ResponsiveContainer>

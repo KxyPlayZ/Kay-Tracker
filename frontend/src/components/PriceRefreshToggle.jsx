@@ -1,88 +1,133 @@
 // frontend/src/components/PriceRefreshToggle.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { aktienAPI } from '../services/api';
 
-const PriceRefreshToggle = ({ depotId, onPricesUpdated, darkMode }) => {
-  const [autoRefresh, setAutoRefresh] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [lastUpdate, setLastUpdate] = useState(null);
-  const [interval, setIntervalValue] = useState(10);
+const PriceRefreshToggle = ({ depotId, darkMode, onPricesUpdated }) => {
+  const [updating, setUpdating] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(() => {
+    // Lade gespeicherten Status aus localStorage
+    const saved = localStorage.getItem(`autoRefresh_${depotId}`);
+    return saved === 'true';
+  });
+  const [countdown, setCountdown] = useState(30);
+  const intervalRef = useRef(null);
+  const countdownRef = useRef(null);
 
-  useEffect(() => {
-    if (!autoRefresh || !depotId) return;
-
-    const timer = setInterval(async () => {
-      await refreshPrices();
-    }, interval * 1000);
-
-    return () => clearInterval(timer);
-  }, [autoRefresh, depotId, interval]);
-
-  const refreshPrices = async () => {
+  const handleUpdateAllPrices = async () => {
+    if (!depotId) return;
+    
+    setUpdating(true);
     try {
-      setRefreshing(true);
-      const response = await aktienAPI.updatePrices(depotId);
-      setLastUpdate(new Date());
+      const result = await aktienAPI.updatePrices(depotId);
+      
+      // NUR Daten aktualisieren, KEINE Seite neu laden!
       if (onPricesUpdated) {
-        onPricesUpdated();
+        await onPricesUpdated();
       }
-      console.log(`✓ ${response.data.updated} Preise aktualisiert`);
+      
+      // Keine Alert-Meldung bei Auto-Refresh
+      console.log(`Preise aktualisiert: ${result.data.updated} von ${result.data.total} Aktien`);
     } catch (error) {
       console.error('Fehler beim Aktualisieren der Preise:', error);
+      // Nur bei Fehler eine Meldung zeigen
+      if (!autoRefresh) {
+        alert('Fehler beim Aktualisieren der Preise: ' + error.message);
+      }
     } finally {
-      setRefreshing(false);
+      setUpdating(false);
     }
   };
 
+  // Speichere Auto-Refresh Status wenn er sich ändert
+  const toggleAutoRefresh = () => {
+    const newValue = !autoRefresh;
+    setAutoRefresh(newValue);
+    localStorage.setItem(`autoRefresh_${depotId}`, newValue.toString());
+  };
+
+  useEffect(() => {
+    if (autoRefresh) {
+      // Countdown starten
+      setCountdown(30);
+      countdownRef.current = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev <= 1) {
+            return 30;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      // Auto-Refresh alle 30 Sekunden
+      intervalRef.current = setInterval(() => {
+        handleUpdateAllPrices();
+      }, 30000);
+
+      // Sofort beim Aktivieren aktualisieren
+      handleUpdateAllPrices();
+    } else {
+      // Cleanup
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      if (countdownRef.current) {
+        clearInterval(countdownRef.current);
+        countdownRef.current = null;
+      }
+      setCountdown(30);
+    }
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+      if (countdownRef.current) {
+        clearInterval(countdownRef.current);
+      }
+    };
+  }, [autoRefresh, depotId]);
+
   return (
-    <div className={`flex items-center gap-4 ${darkMode ? 'bg-gray-800' : 'bg-white'} p-4 rounded-lg shadow`}>
+    <div className="flex items-center gap-3">
+      {/* Auto-Aktualisierung Toggle */}
       <div className="flex items-center gap-2">
         <label className="flex items-center cursor-pointer">
-          <input
-            type="checkbox"
-            checked={autoRefresh}
-            onChange={(e) => setAutoRefresh(e.target.checked)}
-            className="sr-only peer"
-          />
-          <div className="relative w-11 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-          <span className="ms-3 text-sm font-medium">
-            {autoRefresh ? 'Auto-Refresh AN' : 'Auto-Refresh AUS'}
+          <div className="relative">
+            <input
+              type="checkbox"
+              checked={autoRefresh}
+              onChange={toggleAutoRefresh}
+              className="sr-only"
+            />
+            <div className={`block w-10 h-6 rounded-full transition-colors ${
+              autoRefresh ? 'bg-green-500' : darkMode ? 'bg-gray-600' : 'bg-gray-300'
+            }`}></div>
+            <div className={`absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${
+              autoRefresh ? 'transform translate-x-4' : ''
+            }`}></div>
+          </div>
+          <span className={`ml-2 text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+            Auto {autoRefresh && `(${countdown}s)`}
           </span>
         </label>
       </div>
 
-      {autoRefresh && (
-        <div className="flex items-center gap-2">
-          <label className="text-sm">Intervall:</label>
-          <select
-            value={interval}
-            onChange={(e) => setIntervalValue(parseInt(e.target.value))}
-            className={`px-2 py-1 rounded border text-sm ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
-          >
-            <option value={5}>5 Sek</option>
-            <option value={10}>10 Sek</option>
-            <option value={30}>30 Sek</option>
-            <option value={60}>1 Min</option>
-            <option value={300}>5 Min</option>
-          </select>
-        </div>
-      )}
-
+      {/* Manueller Refresh Button */}
       <button
-        onClick={refreshPrices}
-        disabled={refreshing}
-        className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+        onClick={handleUpdateAllPrices}
+        disabled={updating}
+        className={`flex items-center gap-2 px-4 py-2 rounded transition-colors ${
+          updating 
+            ? 'bg-gray-400 cursor-not-allowed' 
+            : 'bg-blue-500 hover:bg-blue-600 text-white'
+        }`}
+        title="Alle Preise manuell aktualisieren"
       >
-        <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
-        Jetzt aktualisieren
+        <RefreshCw size={18} className={updating ? 'animate-spin' : ''} />
+        {updating ? 'Aktualisiere...' : 'Preise aktualisieren'}
       </button>
-
-      {lastUpdate && (
-        <span className="text-xs text-gray-500">
-          Zuletzt: {lastUpdate.toLocaleTimeString('de-DE')}
-        </span>
-      )}
     </div>
   );
 };

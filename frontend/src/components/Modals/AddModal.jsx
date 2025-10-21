@@ -1,7 +1,7 @@
 // frontend/src/components/Modals/AddModal.jsx
 import React, { useState, useEffect } from 'react';
 import { Upload, X } from 'lucide-react';
-import { addDepot, buyAktie, sellAktie, importAktien, importJustTradeCSV } from '../../services/api';
+import { addDepot, buyAktie, sellAktie, importJustTradeCSV } from '../../services/api';
 
 const AddModal = ({ onClose, depots, aktien, darkMode }) => {
   const [addType, setAddType] = useState('depot');
@@ -15,7 +15,8 @@ const AddModal = ({ onClose, depots, aktien, darkMode }) => {
     buy_price: '',
     current_price: '',
     category: 'Aktie',
-    transaction_date: ''
+    transaction_date: '',
+    cash_bestand: '10000'
   });
   const [loading, setLoading] = useState(false);
 
@@ -37,6 +38,21 @@ const AddModal = ({ onClose, depots, aktien, darkMode }) => {
     window.addEventListener('keydown', handleEsc);
     return () => window.removeEventListener('keydown', handleEsc);
   }, [onClose]);
+
+  const handleDepotSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await addDepot({
+        name: formData.name,
+        cash_bestand: parseFloat(formData.cash_bestand)
+      });
+      alert('Depot erfolgreich erstellt!');
+      setFormData({ ...formData, name: '', cash_bestand: '10000' });
+      onClose();
+    } catch (error) {
+      alert('Fehler beim Erstellen des Depots: ' + (error.response?.data?.error || error.message));
+    }
+  };
 
   const handleBuy = async (e) => {
     e.preventDefault();
@@ -217,98 +233,317 @@ const AddModal = ({ onClose, depots, aktien, darkMode }) => {
     reader.readAsText(file, 'UTF-8');
   };
 
-  const handleJSONUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      try {
-        const aktienList = JSON.parse(event.target.result);
-        await importAktien(parseInt(formData.depot_id), aktienList);
-        alert(`${aktienList.length} Aktien erfolgreich importiert!`);
-        onClose();
-      } catch (error) {
-        alert('Fehler beim JSON-Import: ' + error.message);
-      }
-    };
-    reader.readAsText(file);
-  };
-
   const availableAktien = safeAktien.filter(a => parseFloat(a.current_shares || a.shares) > 0);
   const currentAktieData = selectedAktie ? safeAktien.find(a => a.id === parseInt(selectedAktie)) : null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto`}>
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-xl font-semibold">Hinzufügen / Verkaufen</h3>
-          <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onClose(); }} type="button" className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+      <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900'} p-8 rounded-lg shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto`}>
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-bold">Hinzufügen</h2>
+          <button onClick={onClose} className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors">
             <X size={24} />
           </button>
         </div>
 
-        <div className="flex gap-2 mb-4 flex-wrap">
-          <button onClick={() => setAddType('depot')} className={`flex-1 py-2 px-3 rounded transition-colors text-sm ${addType === 'depot' ? 'bg-blue-500 text-white' : darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'}`}>Depot</button>
-          <button onClick={() => setAddType('buy')} className={`flex-1 py-2 px-3 rounded transition-colors text-sm ${addType === 'buy' ? 'bg-green-500 text-white' : darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'}`}>Kaufen</button>
-          <button onClick={() => setAddType('sell')} className={`flex-1 py-2 px-3 rounded transition-colors text-sm ${addType === 'sell' ? 'bg-red-500 text-white' : darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'}`}>Verkaufen</button>
-          <button onClick={() => setAddType('csv')} className={`flex-1 py-2 px-3 rounded transition-colors text-sm ${addType === 'csv' ? 'bg-blue-500 text-white' : darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'}`}>CSV</button>
-          <button onClick={() => setAddType('json')} className={`flex-1 py-2 px-3 rounded transition-colors text-sm ${addType === 'json' ? 'bg-blue-500 text-white' : darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'}`}>JSON</button>
+        {/* Tab Buttons */}
+        <div className="flex gap-2 mb-6">
+          <button 
+            onClick={() => setAddType('depot')} 
+            className={`px-4 py-2 rounded transition-colors ${
+              addType === 'depot' 
+                ? 'bg-blue-500 text-white' 
+                : darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'
+            }`}
+          >
+            Depot
+          </button>
+          <button 
+            onClick={() => setAddType('buy')} 
+            className={`px-4 py-2 rounded transition-colors ${
+              addType === 'buy' 
+                ? 'bg-blue-500 text-white' 
+                : darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'
+            }`}
+          >
+            Kauf
+          </button>
+          <button 
+            onClick={() => setAddType('sell')} 
+            className={`px-4 py-2 rounded transition-colors ${
+              addType === 'sell' 
+                ? 'bg-blue-500 text-white' 
+                : darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'
+            }`}
+          >
+            Verkauf
+          </button>
+          {/* Punkt 8: CSV Import (JSON Import entfernt) */}
+          <button 
+            onClick={() => setAddType('csv')} 
+            className={`px-4 py-2 rounded transition-colors ${
+              addType === 'csv' 
+                ? 'bg-blue-500 text-white' 
+                : darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'
+            }`}
+          >
+            CSV Import
+          </button>
         </div>
 
+        {/* Depot Form */}
         {addType === 'depot' ? (
-          <form onSubmit={async (e) => { e.preventDefault(); const name = e.target.elements.depotName.value; const cashBestand = e.target.elements.cashBestand.value; try { await addDepot({ name, cash_bestand: parseFloat(cashBestand) }); alert('Depot erfolgreich erstellt!'); window.location.reload(); } catch (error) { alert('Fehler beim Erstellen des Depots: ' + error.message); } }} className="space-y-4">
-            <div><label className="block mb-1 text-sm font-medium">Depot Name</label><input type="text" name="depotName" className={`w-full p-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`} required placeholder="z.B. JustTrade" /></div>
-            <div><label className="block mb-1 text-sm font-medium">Cashbestand (€)</label><input type="number" step="0.01" name="cashBestand" className={`w-full p-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`} required placeholder="5000.00" defaultValue="0" /></div>
-            <button type="submit" className="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600 transition-colors font-medium">Depot erstellen</button>
+          <form onSubmit={handleDepotSubmit} className="space-y-4">
+            <div>
+              <label className="block mb-1 text-sm font-medium">Depot Name</label>
+              <input 
+                type="text" 
+                value={formData.name} 
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })} 
+                className={`w-full p-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`} 
+                required 
+                placeholder="z.B. Haupt-Depot" 
+              />
+            </div>
+            <div>
+              <label className="block mb-1 text-sm font-medium">Cashbestand (€)</label>
+              <input 
+                type="number" 
+                step="0.01" 
+                value={formData.cash_bestand} 
+                onChange={(e) => setFormData({ ...formData, cash_bestand: e.target.value })} 
+                className={`w-full p-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`} 
+                required 
+                placeholder="10000" 
+              />
+            </div>
+            <button 
+              type="submit" 
+              className="w-full bg-green-500 text-white py-2 rounded hover:bg-green-600 transition-colors font-medium"
+            >
+              Depot erstellen
+            </button>
           </form>
+
+        // Buy Form
         ) : addType === 'buy' ? (
           <form onSubmit={handleBuy} className="space-y-4">
-            {safeDepots.length === 0 ? (<div className="text-center py-4 text-red-500">Bitte erstelle zuerst ein Depot!</div>) : (<>
-              <div><label className="block mb-1 text-sm font-medium">Depot</label><select value={formData.depot_id} onChange={(e) => setFormData({ ...formData, depot_id: e.target.value })} className={`w-full p-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}>{safeDepots.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select></div>
-              <div><label className="block mb-1 text-sm font-medium">Aktienname</label><input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className={`w-full p-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`} required placeholder="z.B. Apple Inc." /></div>
-              <div><label className="block mb-1 text-sm font-medium">Symbol</label><input type="text" value={formData.symbol} onChange={(e) => setFormData({ ...formData, symbol: e.target.value.toUpperCase() })} className={`w-full p-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`} required placeholder="AAPL" /></div>
-              <div><label className="block mb-1 text-sm font-medium">Anzahl Aktien</label><input type="number" step="0.0001" value={formData.shares} onChange={(e) => setFormData({ ...formData, shares: e.target.value })} className={`w-full p-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`} required placeholder="10" /></div>
-              <div><label className="block mb-1 text-sm font-medium">Kaufpreis pro Aktie (€)</label><input type="number" step="0.01" value={formData.price} onChange={(e) => setFormData({ ...formData, price: e.target.value })} className={`w-full p-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`} required placeholder="150.00" /></div>
-              <div><label className="block mb-1 text-sm font-medium">Kategorie</label><select value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })} className={`w-full p-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}><option value="Aktie">Aktie</option><option value="ETF">ETF</option><option value="Krypto">Krypto</option><option value="Rohstoff">Rohstoff</option></select></div>
-              <div><label className="block mb-1 text-sm font-medium">Datum & Uhrzeit (optional)</label><input type="datetime-local" value={formData.transaction_date} onChange={(e) => setFormData({ ...formData, transaction_date: e.target.value })} className={`w-full p-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`} /><p className="text-xs text-gray-500 mt-1">Leer lassen für aktuelles Datum/Uhrzeit</p></div>
-              <button type="submit" className="w-full bg-green-500 text-white py-2 rounded hover:bg-green-600 transition-colors font-medium">Kaufen</button>
-            </>)}
+            {safeDepots.length === 0 ? (
+              <div className="text-red-500 py-4">Bitte erstelle zuerst ein Depot!</div>
+            ) : (
+              <>
+                <div>
+                  <label className="block mb-1 text-sm font-medium">Depot</label>
+                  <select 
+                    value={formData.depot_id} 
+                    onChange={(e) => setFormData({ ...formData, depot_id: e.target.value })} 
+                    className={`w-full p-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`} 
+                    required
+                  >
+                    {safeDepots.map(depot => (
+                      <option key={depot.id} value={depot.id}>{depot.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block mb-1 text-sm font-medium">Aktien Name</label>
+                  <input 
+                    type="text" 
+                    value={formData.name} 
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })} 
+                    className={`w-full p-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`} 
+                    required 
+                    placeholder="z.B. Apple Inc." 
+                  />
+                </div>
+                <div>
+                  <label className="block mb-1 text-sm font-medium">Symbol</label>
+                  <input 
+                    type="text" 
+                    value={formData.symbol} 
+                    onChange={(e) => setFormData({ ...formData, symbol: e.target.value.toUpperCase() })} 
+                    className={`w-full p-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`} 
+                    required 
+                    placeholder="z.B. AAPL" 
+                  />
+                </div>
+                <div>
+                  <label className="block mb-1 text-sm font-medium">Anzahl</label>
+                  <input 
+                    type="number" 
+                    step="0.01" 
+                    value={formData.shares} 
+                    onChange={(e) => setFormData({ ...formData, shares: e.target.value })} 
+                    className={`w-full p-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`} 
+                    required 
+                    placeholder="10" 
+                  />
+                </div>
+                <div>
+                  <label className="block mb-1 text-sm font-medium">Kaufpreis pro Aktie (€)</label>
+                  <input 
+                    type="number" 
+                    step="0.01" 
+                    value={formData.price} 
+                    onChange={(e) => setFormData({ ...formData, price: e.target.value })} 
+                    className={`w-full p-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`} 
+                    required 
+                    placeholder="150.00" 
+                  />
+                </div>
+                <div>
+                  <label className="block mb-1 text-sm font-medium">Datum & Uhrzeit (optional)</label>
+                  <input 
+                    type="datetime-local" 
+                    value={formData.transaction_date} 
+                    onChange={(e) => setFormData({ ...formData, transaction_date: e.target.value })} 
+                    className={`w-full p-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`} 
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Leer lassen für aktuelles Datum/Uhrzeit</p>
+                </div>
+                <button 
+                  type="submit" 
+                  className="w-full bg-green-500 text-white py-2 rounded hover:bg-green-600 transition-colors font-medium"
+                >
+                  Kaufen
+                </button>
+              </>
+            )}
           </form>
+
+        // Sell Form
         ) : addType === 'sell' ? (
           <form onSubmit={handleSell} className="space-y-4">
-            {availableAktien.length === 0 ? (<div className="text-center py-4 text-red-500">Keine Aktien zum Verkaufen vorhanden!</div>) : (<>
-              <div><label className="block mb-1 text-sm font-medium">Aktie auswählen</label><select value={selectedAktie || ''} onChange={(e) => setSelectedAktie(e.target.value)} className={`w-full p-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`} required><option value="">-- Aktie wählen --</option>{availableAktien.map(a => (<option key={a.id} value={a.id}>{a.name} ({a.symbol}) - {parseFloat(a.current_shares || a.shares).toFixed(2)} Stück</option>))}</select></div>
-              {currentAktieData && (<div className={`p-3 rounded ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`}><p className="text-sm"><strong>Verfügbar:</strong> {parseFloat(currentAktieData.current_shares || currentAktieData.shares).toFixed(2)} Stück</p><p className="text-sm"><strong>Ø Kaufpreis:</strong> €{parseFloat(currentAktieData.buy_price).toFixed(2)}</p></div>)}
-              <div><label className="block mb-1 text-sm font-medium">Anzahl verkaufen</label><input type="number" step="0.0001" value={formData.shares} onChange={(e) => setFormData({ ...formData, shares: e.target.value })} className={`w-full p-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`} required placeholder="5" max={currentAktieData ? parseFloat(currentAktieData.current_shares || currentAktieData.shares) : undefined} /></div>
-              <div><label className="block mb-1 text-sm font-medium">Verkaufspreis pro Aktie (€)</label><input type="number" step="0.01" value={formData.price} onChange={(e) => setFormData({ ...formData, price: e.target.value })} className={`w-full p-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`} required placeholder="85.00" /></div>
-              <div><label className="block mb-1 text-sm font-medium">Datum & Uhrzeit (optional)</label><input type="datetime-local" value={formData.transaction_date} onChange={(e) => setFormData({ ...formData, transaction_date: e.target.value })} className={`w-full p-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`} /><p className="text-xs text-gray-500 mt-1">Leer lassen für aktuelles Datum/Uhrzeit</p></div>
-              <button type="submit" className="w-full bg-red-500 text-white py-2 rounded hover:bg-red-600 transition-colors font-medium" disabled={!selectedAktie}>Verkaufen</button>
-            </>)}
+            {availableAktien.length === 0 ? (
+              <div className="text-red-500 py-4">Keine Aktien zum Verkaufen vorhanden!</div>
+            ) : (
+              <>
+                <div>
+                  <label className="block mb-1 text-sm font-medium">Aktie auswählen</label>
+                  <select 
+                    value={selectedAktie || ''} 
+                    onChange={(e) => setSelectedAktie(e.target.value)} 
+                    className={`w-full p-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`} 
+                    required
+                  >
+                    <option value="">-- Aktie wählen --</option>
+                    {availableAktien.map(aktie => (
+                      <option key={aktie.id} value={aktie.id}>
+                        {aktie.name} ({aktie.symbol}) - {parseFloat(aktie.current_shares || aktie.shares).toFixed(2)} Stück
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {currentAktieData && (
+                  <div className={`p-3 rounded ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                    <p className="text-sm"><strong>Verfügbar:</strong> {parseFloat(currentAktieData.current_shares || currentAktieData.shares).toFixed(2)} Stück</p>
+                    <p className="text-sm"><strong>Kaufpreis:</strong> €{parseFloat(currentAktieData.buy_price).toFixed(2)}</p>
+                    <p className="text-sm"><strong>Aktueller Preis:</strong> €{parseFloat(currentAktieData.current_price).toFixed(2)}</p>
+                  </div>
+                )}
+                <div>
+                  <label className="block mb-1 text-sm font-medium">Anzahl verkaufen</label>
+                  <input 
+                    type="number" 
+                    step="0.01" 
+                    value={formData.shares} 
+                    onChange={(e) => setFormData({ ...formData, shares: e.target.value })} 
+                    className={`w-full p-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`} 
+                    required 
+                    placeholder="5" 
+                    max={currentAktieData ? parseFloat(currentAktieData.current_shares || currentAktieData.shares) : undefined} 
+                  />
+                </div>
+                <div>
+                  <label className="block mb-1 text-sm font-medium">Verkaufspreis pro Aktie (€)</label>
+                  <input 
+                    type="number" 
+                    step="0.01" 
+                    value={formData.price} 
+                    onChange={(e) => setFormData({ ...formData, price: e.target.value })} 
+                    className={`w-full p-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`} 
+                    required 
+                    placeholder="85.00" 
+                  />
+                </div>
+                <div>
+                  <label className="block mb-1 text-sm font-medium">Datum & Uhrzeit (optional)</label>
+                  <input 
+                    type="datetime-local" 
+                    value={formData.transaction_date} 
+                    onChange={(e) => setFormData({ ...formData, transaction_date: e.target.value })} 
+                    className={`w-full p-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`} 
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Leer lassen für aktuelles Datum/Uhrzeit</p>
+                </div>
+                <button 
+                  type="submit" 
+                  className="w-full bg-red-500 text-white py-2 rounded hover:bg-red-600 transition-colors font-medium" 
+                  disabled={!selectedAktie}
+                >
+                  Verkaufen
+                </button>
+              </>
+            )}
           </form>
+
+        // CSV Import
         ) : addType === 'csv' ? (
           <div className="text-center py-8">
-            {safeDepots.length === 0 ? (<div className="text-red-500 py-4">Bitte erstelle zuerst ein Depot!</div>) : (<>
-              <Upload size={48} className="mx-auto mb-4 text-gray-400" />
-              <p className={`mb-2 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>JustTrade CSV-Datei hochladen</p>
-              <p className={`text-xs mb-4 ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>Importiert automatisch ALLE Transaktionen (Käufe + Verkäufe)</p>
-              <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded text-sm text-left"><p className="font-medium mb-1">ℹ️ Hinweise:</p><ul className="text-xs space-y-1 list-disc list-inside"><li>ISIN wird automatisch zu Symbol konvertiert</li><li>Käufe UND Verkäufe werden importiert</li><li>Aktuelle Bestände werden automatisch berechnet</li><li>Import kann einige Sekunden dauern</li></ul></div>
-              <div className="mb-4"><label className="block mb-2 text-sm font-medium">Depot auswählen</label><select value={formData.depot_id} onChange={(e) => setFormData({ ...formData, depot_id: e.target.value })} className={`w-full p-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`} disabled={loading}>{safeDepots.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select></div>
-              <input type="file" accept=".csv" onChange={handleJustTradeCSVUpload} disabled={loading} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50" />
-              {loading && (<div className="mt-4 text-blue-500"><div className="animate-spin inline-block w-6 h-6 border-2 border-current border-t-transparent rounded-full"></div><p className="mt-2 text-sm">Import läuft... Bitte warten</p></div>)}
-            </>)}
+            {safeDepots.length === 0 ? (
+              <div className="text-red-500 py-4">Bitte erstelle zuerst ein Depot!</div>
+            ) : (
+              <>
+                <Upload size={48} className="mx-auto mb-4 text-gray-400" />
+                {/* Punkt 8: Hinweis dass nur JustTrade CSV funktioniert */}
+                <p className={`mb-2 font-semibold ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  JustTrade CSV-Datei hochladen
+                </p>
+                <p className={`text-xs mb-4 ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>
+                  ⚠️ Aktuell nur für JustTrade CSV-Exporte
+                </p>
+                <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded text-sm text-left">
+                  <p className="font-medium mb-1">ℹ️ Hinweise:</p>
+                  <ul className="text-xs space-y-1 list-disc list-inside">
+                    <li>CSV funktioniert nur mit JustTrade Format</li>
+                    <li>Beim Re-Import werden alte CSV-Daten überschrieben</li>
+                    <li>Manuelle Käufe/Verkäufe bleiben erhalten</li>
+                    <li>ISIN wird automatisch zu Symbol konvertiert</li>
+                    <li>Käufe UND Verkäufe werden importiert</li>
+                    <li>Aktuelle Bestände werden automatisch berechnet</li>
+                    <li>Import kann einige Sekunden dauern</li>
+                  </ul>
+                </div>
+                <div className="mb-4">
+                  <label className="block mb-2 text-sm font-medium">Depot auswählen</label>
+                  <select 
+                    value={formData.depot_id} 
+                    onChange={(e) => setFormData({ ...formData, depot_id: e.target.value })} 
+                    className={`w-full p-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`} 
+                    required
+                  >
+                    {safeDepots.map(depot => (
+                      <option key={depot.id} value={depot.id}>{depot.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <input 
+                  type="file" 
+                  accept=".csv" 
+                  onChange={handleJustTradeCSVUpload} 
+                  className={`w-full p-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`} 
+                  disabled={loading} 
+                />
+                {loading && (
+                  <div className="mt-4 text-center">
+                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                    <p className="mt-2 text-sm">Importiere Daten...</p>
+                  </div>
+                )}
+              </>
+            )}
           </div>
-        ) : (
-          <div className="text-center py-8">
-            {safeDepots.length === 0 ? (<div className="text-red-500 py-4">Bitte erstelle zuerst ein Depot!</div>) : (<>
-              <Upload size={48} className="mx-auto mb-4 text-gray-400" />
-              <p className={`mb-4 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>JSON-Datei hochladen</p>
-              <p className={`text-xs mb-4 ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>Format: Array von Objekten</p>
-              <div className="mb-4"><label className="block mb-2 text-sm font-medium">Depot auswählen</label><select value={formData.depot_id} onChange={(e) => setFormData({ ...formData, depot_id: e.target.value })} className={`w-full p-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}>{safeDepots.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select></div>
-              <input type="file" accept=".json" onChange={handleJSONUpload} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
-            </>)}
-          </div>
-        )}
+        ) : null}
       </div>
     </div>
   );
