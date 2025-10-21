@@ -72,7 +72,10 @@ export const aktienAPI = {
   delete: (id) => api.delete(`/aktien/${id}`),
   import: (data) => api.post('/aktien/import', data),
   getTradeHistory: (depotId) => api.get(`/aktien/history/depot/${depotId}`),
+  updatePrices: (depotId) => api.put(`/aktien/prices/${depotId}`),
+  refreshSinglePrice: (aktieId) => api.put(`/aktien/refresh/${aktieId}`),
 };
+
 
 export const transactionAPI = {
   buy: (data) => api.post('/transactions/buy', data),

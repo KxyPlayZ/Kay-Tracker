@@ -2,8 +2,9 @@
 import React, { useState, useEffect } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { aktienAPI, updateDepotPrices, refreshSinglePrice } from '../../services/api';
+import { aktienAPI } from '../../services/api';
 import PerformanceChart from '../Charts/PerformanceChart';
+import PriceRefreshToggle from '../PriceRefreshToggle';
 
 const DepotView = ({ depot }) => {
   const { darkMode, aktien } = useApp();
@@ -52,9 +53,9 @@ const DepotView = ({ depot }) => {
     
     setUpdatingPrices(true);
     try {
-      const result = await updateDepotPrices(depot.id);
+      const result = await aktienAPI.updatePrices(depot.id);
       setLastUpdate(new Date());
-      alert(`Preise aktualisiert: ${result.updated} von ${result.total} Aktien`);
+      alert(`Preise aktualisiert: ${result.data.updated} von ${result.data.total} Aktien`);
       window.location.reload();
     } catch (error) {
       alert('Fehler beim Aktualisieren der Preise: ' + error.message);
@@ -66,8 +67,8 @@ const DepotView = ({ depot }) => {
   // Funktion zum Aktualisieren eines einzelnen Preises
   const handleRefreshSinglePrice = async (aktieId) => {
     try {
-      const result = await refreshSinglePrice(aktieId);
-      alert(`Preis aktualisiert: ${result.symbol} - €${result.new_price}`);
+      const result = await aktienAPI.refreshSinglePrice(aktieId);
+      alert(`Preis aktualisiert: ${result.data.symbol} - €${result.data.new_price}`);
       window.location.reload();
     } catch (error) {
       alert('Fehler beim Aktualisieren des Preises: ' + error.message);
@@ -76,35 +77,6 @@ const DepotView = ({ depot }) => {
 
   return (
     <div className="space-y-6">
-      {/* Depot Header mit Update-Button */}
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">
-          {depot?.name || 'Depot Overview'}
-        </h2>
-        
-        <div className="flex items-center gap-4">
-          {lastUpdate && (
-            <span className="text-sm text-gray-500">
-              Letzte Aktualisierung: {lastUpdate.toLocaleTimeString('de-DE')}
-            </span>
-          )}
-          <button
-            onClick={handleUpdateAllPrices}
-            disabled={updatingPrices || !depot}
-            className={`flex items-center gap-2 px-4 py-2 rounded transition-colors ${
-              updatingPrices 
-                ? 'bg-gray-400 cursor-not-allowed' 
-                : 'bg-blue-500 hover:bg-blue-600 text-white'
-            }`}
-          >
-            <RefreshCw 
-              size={18} 
-              className={updatingPrices ? 'animate-spin' : ''} 
-            />
-            {updatingPrices ? 'Aktualisiere...' : 'Preise aktualisieren'}
-          </button>
-        </div>
-      </div>
 
       {/* Performance und Zusammenfassung */}
       <div className="grid grid-cols-2 gap-6">
@@ -141,7 +113,14 @@ const DepotView = ({ depot }) => {
 
       {/* Aktuelle Trades Tabelle - MIT ISIN/Symbol Spalte */}
       <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} p-6 rounded-lg shadow-lg`}>
-        <h3 className="text-lg font-semibold mb-4">Aktuelle Trades im Besitz</h3>
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-semibold">Aktuelle Trades im Besitz</h3>
+          <PriceRefreshToggle 
+            depotId={depot.id} 
+            onPricesUpdated={() => window.location.reload()} 
+            darkMode={darkMode} 
+          />
+        </div>
         {loading ? (
           <div className="text-center py-8 text-gray-500">Lädt...</div>
         ) : (
