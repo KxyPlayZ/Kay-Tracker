@@ -9,17 +9,6 @@ const api = axios.create({
   },
 });
 
-// Helper function für Auth Header
-const getAuthHeader = () => {
-  const token = localStorage.getItem('token');
-  return {
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: token ? `Bearer ${token}` : ''
-    }
-  };
-};
-
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
@@ -71,7 +60,6 @@ export const aktienAPI = {
   update: (id, data) => api.put(`/aktien/${id}`, data),
   delete: (id) => api.delete(`/aktien/${id}`),
   import: (data) => api.post('/aktien/import', data),
-  getTradeHistory: (depotId) => api.get(`/aktien/history/depot/${depotId}`),
 };
 
 export const transactionAPI = {
@@ -81,66 +69,6 @@ export const transactionAPI = {
   getDepotTimeline: (depotId) => api.get(`/transactions/timeline/depot/${depotId}`),
   getUserTimeline: () => api.get('/transactions/timeline/user'),
   deleteTransaction: (transactionId) => api.delete(`/transactions/${transactionId}`),
-};
-
-// Helper Funktionen für AddModal.jsx
-export const addDepot = async (data) => {
-  const response = await api.post('/depots', data);
-  return response.data;
-};
-
-export const buyAktie = async (data) => {
-  const response = await api.post('/transactions/buy', data);
-  return response.data;
-};
-
-export const sellAktie = async (data) => {
-  const response = await api.post('/transactions/sell', data);
-  return response.data;
-};
-
-export const importAktien = async (depotId, aktienList) => {
-  const response = await api.post('/aktien/import', {
-    depot_id: depotId,
-    aktien: aktienList
-  });
-  return response.data;
-};
-
-// JustTrade CSV Import
-export const importJustTradeCSV = async (depotId, aktienData) => {
-  try {
-    const response = await api.post('/aktien/import/justtrade', {
-      depot_id: depotId,
-      aktien: aktienData
-    });
-    return response.data;
-  } catch (error) {
-    console.error('Fehler beim JustTrade Import:', error);
-    throw error;
-  }
-};
-
-// Alle Preise eines Depots aktualisieren
-export const updateDepotPrices = async (depotId) => {
-  try {
-    const response = await api.post(`/aktien/prices/update/${depotId}`, {});
-    return response.data;
-  } catch (error) {
-    console.error('Fehler beim Aktualisieren der Preise:', error);
-    throw error;
-  }
-};
-
-// Einzelnen Aktienpreis aktualisieren
-export const refreshSinglePrice = async (aktieId) => {
-  try {
-    const response = await api.post(`/aktien/prices/refresh/${aktieId}`, {});
-    return response.data;
-  } catch (error) {
-    console.error('Fehler beim Aktualisieren des Preises:', error);
-    throw error;
-  }
 };
 
 export default api;

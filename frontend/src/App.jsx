@@ -8,12 +8,13 @@ import UebersichtView from './components/Views/UebersichtView';
 import DepotView from './components/Views/DepotView';
 import MarktView from './components/Views/MarktView';
 import EinstellungenView from './components/Views/EinstellungenView';
+import ISINVerwaltungView from './components/Views/ISINVerwaltungView';
 import AddModal from './components/Modals/AddModal';
 import Login from './components/Auth/Login';
 import './styles/App.css';
 
 function App() {
-  const { darkMode, user, loading, depots } = useApp();
+  const { darkMode, user, loading, depots, aktien } = useApp();  // <-- aktien hinzugefügt!
   const [activeView, setActiveView] = useState('uebersicht');
   const [selectedDepot, setSelectedDepot] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -72,6 +73,7 @@ function App() {
               </div>
             )}
             {activeView === 'depot' && selectedDepot && <DepotView depot={selectedDepot} />}
+            {activeView === 'isin-verwaltung' && <ISINVerwaltungView />}
             {activeView === 'markt' && <MarktView />}
             {activeView === 'einstellungen' && <EinstellungenView />}
           </main>
@@ -84,7 +86,14 @@ function App() {
             <Plus size={24} />
           </button>
 
-          <AddModal show={showAddModal} onClose={() => setShowAddModal(false)} />
+          {showAddModal && (
+            <AddModal 
+              onClose={() => setShowAddModal(false)}
+              depots={depots}
+              aktien={aktien}
+              darkMode={darkMode}
+            />
+          )}
         </div>
       </div>
     </div>

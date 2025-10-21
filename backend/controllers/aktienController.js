@@ -1,4 +1,5 @@
 // backend/controllers/aktienController.js
+const { getSymbolFromISIN, getCurrentPrice, getCurrentPrices } = require('../services/apiServices');
 const pool = require('../config/database');
 
 // Alle Aktien eines Depots abrufen
@@ -178,6 +179,273 @@ exports.deleteAktie = async (req, res) => {
   } catch (error) {
     console.error('Fehler beim Löschen der Aktie:', error);
     res.status(500).json({ error: 'Serverfehler' });
+  }
+};
+
+// JustTrade CSV Import mit ISIN-zu-Symbol-Konvertierung
+exports.importJustTradeCSV = async (req, res) => {
+  const client = await pool.connect();
+  
+  try {
+    const { depot_id, aktien } = req.body;
+
+    if (!depot_id || !Array.isArray(aktien) || aktien.length === 0) {
+      return res.status(400).json({ error: 'Ungültige Daten' });
+    }
+
+    const depotCheck = await client.query(
+      'SELECT * FROM depots WHERE id = $1 AND user_id = $2',
+      [depot_id, req.userId]
+    );
+
+    if (depotCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Depot nicht gefunden' });
+    }
+
+    await client.query('BEGIN');
+
+    const importedAktien = [];
+    const errors = [];
+    
+    for (const [index, aktie] of aktien.entries()) {
+      try {
+        const { isin, name, shares, buy_price } = aktie;
+        
+        if (!isin || !shares || !buy_price) {
+          errors.push({ index, error: 'Fehlende Pflichtfelder', data: aktie });
+          continue;
+        }
+
+        // 1. Prüfe zuerst die User-Mapping-Tabelle
+        console.log(`Suche ISIN ${isin} in Mapping-Tabelle...`);
+        let mappingResult = await client.query(
+          'SELECT symbol, name FROM isin_mapping WHERE user_id = $1 AND isin = $2',
+          [req.userId, isin]
+        );
+
+        let symbol, aktienName;
+
+        if (mappingResult.rows.length > 0) {
+          // Prüfe ob Symbol schon ausgefüllt ist
+          if (mappingResult.rows[0].symbol && mappingResult.rows[0].symbol.trim() !== '') {
+            // Symbol vorhanden - nutze es!
+            symbol = mappingResult.rows[0].symbol;
+            aktienName = name || mappingResult.rows[0].name;
+            console.log(`✓ ISIN ${isin} gefunden: ${symbol}`);
+          } else {
+            // ISIN existiert, aber Symbol fehlt noch
+            console.log(`⚠ ISIN ${isin} gefunden, aber Symbol fehlt`);
+            errors.push({ 
+              index, 
+              isin,
+              name: name || mappingResult.rows[0].name || 'Unbekannt',
+              error: 'Symbol fehlt. Bitte in "ISIN Verwaltung" das Symbol nachtragen.',
+              needsMapping: true,
+              alreadyInTable: true
+            });
+            continue;
+          }
+        } else {
+          // ISIN nicht gefunden - automatisch mit leerem Symbol eintragen
+          console.log(`➕ ISIN ${isin} nicht gefunden - trage automatisch ein`);
+          
+          try {
+            await client.query(
+              'INSERT INTO isin_mapping (user_id, isin, symbol, name) VALUES ($1, $2, $3, $4) ON CONFLICT (user_id, isin) DO NOTHING',
+              [req.userId, isin, '', name || '']
+            );
+            
+            errors.push({ 
+              index, 
+              isin,
+              name: name || 'Unbekannt',
+              error: 'ISIN wurde automatisch hinzugefügt. Bitte in "ISIN Verwaltung" das Symbol nachtragen.',
+              needsMapping: true,
+              autoAdded: true
+            });
+          } catch (insertError) {
+            console.error(`Fehler beim automatischen Eintragen von ${isin}:`, insertError);
+            errors.push({ 
+              index, 
+              isin,
+              name: name || 'Unbekannt',
+              error: 'Konnte ISIN nicht automatisch hinzufügen.',
+              needsMapping: true
+            });
+          }
+          continue;
+        }
+
+        console.log(`Hole aktuellen Preis für ${symbol}...`);
+        let currentPrice;
+        try {
+          const priceData = await getCurrentPrice(symbol);
+          currentPrice = priceData.price;
+        } catch (error) {
+          console.error(`Preis konnte nicht abgerufen werden für ${symbol}, verwende buy_price`);
+          currentPrice = buy_price;
+        }
+
+        const result = await client.query(
+          `INSERT INTO aktien
+          (depot_id, name, symbol, isin, shares, buy_price, current_price, current_shares, category)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          RETURNING *`,
+          [
+            depot_id,
+            aktienName,
+            symbol,
+            isin,
+            shares,
+            buy_price,
+            currentPrice,
+            shares,
+            aktie.category || 'Aktie'
+          ]
+        );
+
+        await client.query(
+          `INSERT INTO transactions
+          (aktie_id, type, shares, price, transaction_timestamp)
+          VALUES ($1, $2, $3, $4, $5)`,
+          [
+            result.rows[0].id,
+            'BUY',
+            shares,
+            buy_price,
+            aktie.transaction_date || new Date()
+          ]
+        );
+
+        importedAktien.push(result.rows[0]);
+
+        // Rate limiting zwischen API-Aufrufen - AM ENDE!
+        await new Promise(resolve => setTimeout(resolve, 3000)); // 3 Sekunden!
+
+        // Extra Pause nach jeweils 20 Aktien
+        if ((index + 1) % 20 === 0) {
+          console.log(`⏸️  Pause nach ${index + 1} Aktien - warte 30 Sekunden...`);
+          await new Promise(resolve => setTimeout(resolve, 30000)); // 30 Sekunden Pause!
+        }
+
+      } catch (error) {
+        console.error(`Fehler bei Aktie Index ${index}:`, error);
+        errors.push({
+          index,
+          error: error.message,
+          data: aktie
+        });
+      }
+    }
+
+    await client.query('COMMIT');
+
+    res.json({
+      message: 'Import abgeschlossen',
+      imported: importedAktien.length,
+      total: aktien.length,
+      errors: errors.length > 0 ? errors : undefined,
+      aktien: importedAktien
+    });
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Fehler beim JustTrade CSV Import:', error);
+    res.status(500).json({ error: 'Serverfehler beim Import' });
+  } finally {
+    client.release();
+  }
+};
+
+// Aktualisiere Preise für alle Aktien eines Depots
+exports.updatePrices = async (req, res) => {
+  try {
+    const { depot_id } = req.params;
+
+    const depotCheck = await pool.query(
+      'SELECT * FROM depots WHERE id = $1 AND user_id = $2',
+      [depot_id, req.userId]
+    );
+
+    if (depotCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Depot nicht gefunden' });
+    }
+
+    const aktienResult = await pool.query(
+      'SELECT id, symbol FROM aktien WHERE depot_id = $1',
+      [depot_id]
+    );
+
+    if (aktienResult.rows.length === 0) {
+      return res.json({ message: 'Keine Aktien im Depot', updated: 0 });
+    }
+
+    const symbols = [...new Set(aktienResult.rows.map(a => a.symbol))];
+    const prices = await getCurrentPrices(symbols);
+
+    let updated = 0;
+    for (const aktie of aktienResult.rows) {
+      const newPrice = prices[aktie.symbol];
+      if (newPrice) {
+        await pool.query(
+          'UPDATE aktien SET current_price = $1 WHERE id = $2',
+          [newPrice, aktie.id]
+        );
+        updated++;
+      }
+    }
+
+    res.json({
+      message: 'Preise aktualisiert',
+      updated,
+      total: aktienResult.rows.length,
+      prices
+    });
+
+  } catch (error) {
+    console.error('Fehler beim Aktualisieren der Preise:', error);
+    res.status(500).json({ error: 'Serverfehler beim Preis-Update' });
+  }
+};
+
+// Aktuellen Preis für eine einzelne Aktie abrufen
+exports.refreshSinglePrice = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const aktieResult = await pool.query(
+      `SELECT a.*, d.user_id 
+       FROM aktien a 
+       JOIN depots d ON a.depot_id = d.id 
+       WHERE a.id = $1 AND d.user_id = $2`,
+      [id, req.userId]
+    );
+
+    if (aktieResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Aktie nicht gefunden' });
+    }
+
+    const aktie = aktieResult.rows[0];
+    const priceData = await getCurrentPrice(aktie.symbol);
+
+    await pool.query(
+      'UPDATE aktien SET current_price = $1 WHERE id = $2',
+      [priceData.price, id]
+    );
+
+    res.json({
+      message: 'Preis aktualisiert',
+      aktie_id: id,
+      symbol: aktie.symbol,
+      old_price: aktie.current_price,
+      new_price: priceData.price,
+      currency: priceData.currency,
+      timestamp: priceData.timestamp
+    });
+
+  } catch (error) {
+    console.error('Fehler beim Aktualisieren des Preises:', error);
+    res.status(500).json({ error: 'Serverfehler beim Preis-Update' });
   }
 };
 

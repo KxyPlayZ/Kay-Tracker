@@ -17,4 +17,9 @@ router.put('/:id', aktienController.updateAktie);
 router.delete('/:id', aktienController.deleteAktie);
 router.get('/history/depot/:depotId', aktienController.getTradeHistory);
 
+// Neue Routen für JustTrade Import und Preis-Updates
+router.post('/import/justtrade', aktienController.importJustTradeCSV);
+router.post('/prices/update/:depot_id', aktienController.updatePrices);
+router.post('/prices/refresh/:id', aktienController.refreshSinglePrice);
+
 module.exports = router;
