@@ -2,8 +2,10 @@
 import React, { useState, useEffect } from 'react';
 import { Upload, X } from 'lucide-react';
 import { addDepot, buyAktie, sellAktie, importJustTradeCSV } from '../../services/api';
+import { useApp } from '../../context/AppContext';
 
-const AddModal = ({ onClose, depots, aktien, darkMode }) => {
+const AddModal = ({ onClose, depots, aktien, darkMode, currentDepot }) => {
+  const { loadData } = useApp(); // loadData aus Context holen!
   const [addType, setAddType] = useState('depot');
   const [selectedAktie, setSelectedAktie] = useState(null);
   const [formData, setFormData] = useState({
@@ -21,10 +23,13 @@ const AddModal = ({ onClose, depots, aktien, darkMode }) => {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (depots && depots.length > 0 && !formData.depot_id) {
+    // Wenn wir in einem Depot-Fenster sind, verwende currentDepot
+    if (currentDepot && currentDepot.id) {
+      setFormData(prev => ({ ...prev, depot_id: currentDepot.id }));
+    } else if (depots && depots.length > 0 && !formData.depot_id) {
       setFormData(prev => ({ ...prev, depot_id: depots[0].id }));
     }
-  }, [depots]);
+  }, [depots, currentDepot]);
 
   const safeDepots = depots || [];
   const safeAktien = aktien || [];
@@ -48,6 +53,7 @@ const AddModal = ({ onClose, depots, aktien, darkMode }) => {
       });
       alert('Depot erfolgreich erstellt!');
       setFormData({ ...formData, name: '', cash_bestand: '10000' });
+      await loadData();
       onClose();
     } catch (error) {
       alert('Fehler beim Erstellen des Depots: ' + (error.response?.data?.error || error.message));
@@ -69,6 +75,7 @@ const AddModal = ({ onClose, depots, aktien, darkMode }) => {
       
       alert('Kauf erfolgreich!');
       setFormData({ ...formData, name: '', symbol: '', shares: '', price: '', transaction_date: '' });
+      await loadData();
       onClose();
     } catch (error) {
       alert('Fehler beim Kauf: ' + (error.response?.data?.error || error.message));
@@ -88,6 +95,7 @@ const AddModal = ({ onClose, depots, aktien, darkMode }) => {
       alert(`Verkauf erfolgreich! Gewinn: €${result.gewinn.toFixed(2)}`);
       setSelectedAktie(null);
       setFormData({ ...formData, shares: '', price: '', transaction_date: '' });
+      await loadData();
       onClose();
     } catch (error) {
       alert('Fehler beim Verkauf: ' + (error.response?.data?.error || error.message));
@@ -114,9 +122,10 @@ const AddModal = ({ onClose, depots, aktien, darkMode }) => {
         const sharesIndex = headers.findIndex(h => h === 'Anzahl (Ausführung)');
         const priceIndex = headers.findIndex(h => h === 'Kurs (Ausführung)');
         const dateIndex = headers.findIndex(h => h === 'Datum (Ausführung)');
+        const timeIndex = headers.findIndex(h => h === 'Uhrzeit (Ausführung)');
         const richtungIndex = headers.findIndex(h => h === 'Richtung');
 
-        console.log('Gefundene Indizes:', { isin: isinIndex, name: nameIndex, shares: sharesIndex, price: priceIndex, date: dateIndex, richtung: richtungIndex });
+        console.log('Gefundene Indizes:', { isin: isinIndex, name: nameIndex, shares: sharesIndex, price: priceIndex, date: dateIndex, time: timeIndex, richtung: richtungIndex });
 
         if (isinIndex === -1 || sharesIndex === -1 || priceIndex === -1) {
           alert('CSV-Format ungültig. Ist das eine echte JustTrade CSV-Datei?');
@@ -142,18 +151,24 @@ const AddModal = ({ onClose, depots, aktien, darkMode }) => {
           let transaction_date = null;
           if (dateIndex !== -1 && values[dateIndex]) {
             const germanDate = values[dateIndex];
+            const germanTime = timeIndex !== -1 ? values[timeIndex] : '';
+            
+            // Datum parsen: "22.10.2025" -> "2025-10-22"
             const parts = germanDate.split('.');
             if (parts.length === 3) {
-              transaction_date = `${parts[2]}-${parts[1]}-${parts[0]}`;
+              const [day, month, year] = parts;
+              const formattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+              
+              // Uhrzeit hinzufügen wenn vorhanden: "16:51:41"
+              if (germanTime) {
+                transaction_date = `${formattedDate}T${germanTime}`;
+              } else {
+                transaction_date = formattedDate;
+              }
             }
           }
           
-          if (!isin || !shares || !price) {
-            console.warn(`Zeile ${i+1} übersprungen: Fehlende Daten`);
-            continue;
-          }
-
-          console.log(`Zeile ${i+1}: ${name} (${isin}) - ${shares} Stück @ ${price}€ [${isBuy ? 'KAUF' : 'VERKAUF'}]`);
+          console.log(`Zeile ${i}: ${isin} - ${name} - ${shares} @ ${price} [${isBuy ? 'KAUF' : 'VERKAUF'}]`);
 
           aktienList.push({
             isin,
@@ -179,22 +194,15 @@ const AddModal = ({ onClose, depots, aktien, darkMode }) => {
 
         const result = await importJustTradeCSV(parseInt(formData.depot_id), aktienList);
         
-        let message = `Import abgeschlossen!\n\n`;
-        message += `✓ Transaktionen verarbeitet: ${buyCount} Käufe + ${sellCount} Verkäufe\n`;
-        message += `✓ Erfolgreich importiert: ${result.imported || result.importedAktien?.length || 0} Aktien\n`;
-
+        // ÄNDERUNG 4: Import abbrechen wenn ISINs fehlen
         if (result.errors && result.errors.length > 0) {
           const missingMappings = result.errors.filter(e => e.needsMapping);
-          const otherErrors = result.errors.filter(e => !e.needsMapping);
           
           if (missingMappings.length > 0) {
-            const autoAdded = missingMappings.filter(e => e.autoAdded);
+            // Import wurde abgebrochen weil ISINs fehlen
+            let message = `⚠️ CSV-Import abgebrochen!\n\n`;
+            message += `Es fehlen Symbole für ${missingMappings.length} ISIN(s):\n\n`;
             
-            if (autoAdded.length > 0) {
-              message += `\n✅ ${autoAdded.length} ISINs wurden automatisch hinzugefügt!\n`;
-            }
-            
-            message += `\n⚠ Bitte trage die Symbole nach:\n\n`;
             missingMappings.slice(0, 8).forEach(err => {
               message += `• ${err.isin} - ${err.name}\n`;
             });
@@ -203,20 +211,27 @@ const AddModal = ({ onClose, depots, aktien, darkMode }) => {
               message += `\n... und ${missingMappings.length - 8} weitere\n`;
             }
             
-            message += `\n👉 Gehe zu "ISIN Verwaltung" und trage die Symbole ein.\n`;
-          }
-          
-          if (otherErrors.length > 0) {
-            message += `\n❌ Andere Fehler (${otherErrors.length}):\n`;
-            otherErrors.slice(0, 3).forEach(err => {
-              message += `- ${err.isin}: ${err.error}\n`;
-            });
+            message += `\n👉 Bitte gehe zu "ISIN Verwaltung" und trage die Symbole nach.\n`;
+            message += `Dann versuche den Import erneut.`;
+            
+            alert(message);
+            setLoading(false);
+            // Modal bleibt offen damit User nochmal importieren kann
+            return;
           }
         }
+        
+        // Erfolgreicher Import
+        let message = `✅ Import erfolgreich!\n\n`;
+        message += `✓ Transaktionen verarbeitet: ${buyCount} Käufe + ${sellCount} Verkäufe\n`;
+        message += `✓ Erfolgreich importiert: ${result.imported || result.importedAktien?.length || 0} Aktien\n`;
 
         alert(message);
         setLoading(false);
-        window.location.reload();
+        
+        // Daten neu laden ohne Page Reload
+        await loadData();
+        onClose();
         
       } catch (error) {
         console.error('Import Fehler:', error);
@@ -278,7 +293,6 @@ const AddModal = ({ onClose, depots, aktien, darkMode }) => {
           >
             Verkauf
           </button>
-          {/* Punkt 8: CSV Import (JSON Import entfernt) */}
           <button 
             onClick={() => setAddType('csv')} 
             className={`px-4 py-2 rounded transition-colors ${
@@ -495,22 +509,19 @@ const AddModal = ({ onClose, depots, aktien, darkMode }) => {
             ) : (
               <>
                 <Upload size={48} className="mx-auto mb-4 text-gray-400" />
-                {/* Punkt 8: Hinweis dass nur JustTrade CSV funktioniert */}
                 <p className={`mb-2 font-semibold ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                   JustTrade CSV-Datei hochladen
                 </p>
                 <p className={`text-xs mb-4 ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>
                   ⚠️ Aktuell nur für JustTrade CSV-Exporte
                 </p>
+                {/* ÄNDERUNG 2: Hinweise Text verringert - 3 Punkte entfernt */}
                 <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded text-sm text-left">
                   <p className="font-medium mb-1">ℹ️ Hinweise:</p>
                   <ul className="text-xs space-y-1 list-disc list-inside">
                     <li>CSV funktioniert nur mit JustTrade Format</li>
                     <li>Beim Re-Import werden alte CSV-Daten überschrieben</li>
                     <li>Manuelle Käufe/Verkäufe bleiben erhalten</li>
-                    <li>ISIN wird automatisch zu Symbol konvertiert</li>
-                    <li>Käufe UND Verkäufe werden importiert</li>
-                    <li>Aktuelle Bestände werden automatisch berechnet</li>
                     <li>Import kann einige Sekunden dauern</li>
                   </ul>
                 </div>

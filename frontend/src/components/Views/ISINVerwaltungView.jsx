@@ -111,6 +111,14 @@ const ISINVerwaltungView = () => {
           <p className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
             Verwalte deine ISIN zu Symbol Zuordnungen für den CSV-Import
           </p>
+          <a 
+            href="https://finance.yahoo.com/" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-xs text-blue-500 hover:text-blue-600 underline mt-1 inline-block"
+          >
+            → Symbole auf Yahoo Finance suchen
+          </a>
         </div>
         <button
           onClick={() => setShowAddForm(!showAddForm)}
@@ -170,6 +178,17 @@ const ISINVerwaltungView = () => {
           </form>
         </div>
       )}
+
+      {/* Info Box */}
+      <div className={`${darkMode ? 'bg-blue-900/20' : 'bg-blue-50'} p-4 rounded-lg`}>
+        <h4 className="font-semibold mb-2">💡 Wie funktioniert es?</h4>
+        <ul className="text-sm space-y-1 list-disc list-inside">
+          <li>Beim CSV-Import wird zuerst hier nach der ISIN gesucht</li>
+          <li>Wenn die ISIN gefunden wird, wird das Symbol automatisch verwendet</li>
+          <li>Wenn die ISIN NICHT gefunden wird, wirst du aufgefordert sie hier einzutragen</li>
+          <li>Du kannst Mappings jederzeit manuell hinzufügen, bearbeiten oder löschen</li>
+        </ul>
+      </div>
 
       {/* Mappings Table */}
       <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} p-6 rounded-lg shadow-lg`}>
@@ -256,34 +275,34 @@ const ISINVerwaltungView = () => {
                                 const name = document.getElementById(`name-${mapping.id}`).value;
                                 handleUpdate(mapping.id, { symbol, name });
                               }}
-                              className="p-2 text-green-500 hover:bg-green-100 dark:hover:bg-green-900 rounded transition-colors"
+                              className="p-2 bg-green-500 hover:bg-green-600 text-white rounded transition-colors"
                               title="Speichern"
                             >
-                              <Save size={18} />
+                              <Save size={16} />
                             </button>
                             <button
                               onClick={() => setEditingId(null)}
-                              className="p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                              className="p-2 bg-gray-500 hover:bg-gray-600 text-white rounded transition-colors"
                               title="Abbrechen"
                             >
-                              <X size={18} />
+                              <X size={16} />
                             </button>
                           </>
                         ) : (
                           <>
                             <button
                               onClick={() => setEditingId(mapping.id)}
-                              className="p-2 text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-900 rounded transition-colors"
+                              className="p-2 bg-blue-500 hover:bg-blue-600 text-white rounded transition-colors"
                               title="Bearbeiten"
                             >
-                              <Edit2 size={18} />
+                              <Edit2 size={16} />
                             </button>
                             <button
                               onClick={() => handleDelete(mapping.id)}
-                              className="p-2 text-red-500 hover:bg-red-100 dark:hover:bg-red-900 rounded transition-colors"
+                              className="p-2 bg-red-500 hover:bg-red-600 text-white rounded transition-colors"
                               title="Löschen"
                             >
-                              <Trash2 size={18} />
+                              <Trash2 size={16} />
                             </button>
                           </>
                         )}
@@ -295,17 +314,6 @@ const ISINVerwaltungView = () => {
             </table>
           </div>
         )}
-      </div>
-
-      {/* Info Box */}
-      <div className={`${darkMode ? 'bg-blue-900/20' : 'bg-blue-50'} p-4 rounded-lg`}>
-        <h4 className="font-semibold mb-2">💡 Wie funktioniert es?</h4>
-        <ul className="text-sm space-y-1 list-disc list-inside">
-          <li>Beim CSV-Import wird zuerst hier nach der ISIN gesucht</li>
-          <li>Wenn die ISIN gefunden wird, wird das Symbol automatisch verwendet</li>
-          <li>Wenn die ISIN NICHT gefunden wird, wirst du aufgefordert sie hier einzutragen</li>
-          <li>Du kannst Mappings jederzeit manuell hinzufügen, bearbeiten oder löschen</li>
-        </ul>
       </div>
     </div>
   );
