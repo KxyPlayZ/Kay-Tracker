@@ -82,14 +82,14 @@ export const AppProvider = ({ children }) => {
     localStorage.removeItem('token');
   };
 
-  // Depot hinzufügen
+  // Depot hinzufï¿½gen
   const addDepot = async (depotData) => {
     try {
       const response = await depotAPI.create(depotData);
       setDepots([...depots, response.data.depot]);
       return response.data.depot;
     } catch (error) {
-      console.error('Fehler beim Hinzufügen des Depots:', error);
+      console.error('Fehler beim Hinzufï¿½gen des Depots:', error);
       throw error;
     }
   };
@@ -106,26 +106,26 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  // Depot löschen
+  // Depot lï¿½schen
   const deleteDepot = async (id) => {
     try {
       await depotAPI.delete(id);
       setDepots(depots.filter(d => d.id !== id));
       setAktien(aktien.filter(a => a.depot_id !== id));
     } catch (error) {
-      console.error('Fehler beim Löschen des Depots:', error);
+      console.error('Fehler beim Lï¿½schen des Depots:', error);
       throw error;
     }
   };
 
-  // Aktie hinzufügen
+  // Aktie hinzufï¿½gen
   const addAktie = async (aktieData) => {
     try {
       const response = await aktienAPI.create(aktieData);
       setAktien([...aktien, response.data.aktie]);
       return response.data.aktie;
     } catch (error) {
-      console.error('Fehler beim Hinzufügen der Aktie:', error);
+      console.error('Fehler beim Hinzufï¿½gen der Aktie:', error);
       throw error;
     }
   };
@@ -142,13 +142,13 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  // Aktie löschen
+  // Aktie lï¿½schen
   const deleteAktie = async (id) => {
     try {
       await aktienAPI.delete(id);
       setAktien(aktien.filter(a => a.id !== id));
     } catch (error) {
-      console.error('Fehler beim Löschen der Aktie:', error);
+      console.error('Fehler beim Lï¿½schen der Aktie:', error);
       throw error;
     }
   };
@@ -189,26 +189,26 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  // Depot-Daten löschen (nur Aktien)
+  // Depot-Daten lï¿½schen (nur Aktien)
   const clearDepotData = async (depotId) => {
     try {
       const response = await depotAPI.clearDepotData(depotId);
       await loadData();
       return response.data;
     } catch (error) {
-      console.error('Fehler beim Löschen der Depot-Daten:', error);
+      console.error('Fehler beim Lï¿½schen der Depot-Daten:', error);
       throw error;
     }
   };
 
-  // Alle Daten löschen (außer Account)
+  // Alle Daten lï¿½schen (auï¿½er Account)
   const clearAllUserData = async () => {
     try {
       const response = await depotAPI.clearAllUserData();
       await loadData();
       return response.data;
     } catch (error) {
-      console.error('Fehler beim Löschen aller Daten:', error);
+      console.error('Fehler beim Lï¿½schen aller Daten:', error);
       throw error;
     }
   };
@@ -241,6 +241,7 @@ export const AppProvider = ({ children }) => {
     user,
     depots,
     aktien,
+    setAktien, 
     loading,
     performanceTimeline,
     login,

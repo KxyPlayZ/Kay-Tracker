@@ -17,6 +17,7 @@ const ISINVerwaltungView = () => {
     symbol: '',
     name: ''
   });
+  const [searchTerm, setSearchTerm] = useState('');
 
   const getAuthHeader = () => {
     const token = localStorage.getItem('token');
@@ -91,6 +92,17 @@ const ISINVerwaltungView = () => {
     }
   };
 
+  // Filterfunktion für die Suche
+  const filteredMappings = mappings.filter((mapping) => {
+    if (!searchTerm) return true;
+    const search = searchTerm.toLowerCase();
+    return (
+      mapping.isin.toLowerCase().includes(search) ||
+      mapping.symbol.toLowerCase().includes(search) ||
+      (mapping.name && mapping.name.toLowerCase().includes(search))
+    );
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -161,15 +173,32 @@ const ISINVerwaltungView = () => {
 
       {/* Mappings Table */}
       <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} p-6 rounded-lg shadow-lg`}>
-        <h3 className="text-lg font-semibold mb-4">
-          Gespeicherte ISIN Mappings ({mappings.length})
-        </h3>
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-semibold">
+            Gespeicherte ISIN Mappings ({filteredMappings.length})
+          </h3>
+          <div className="relative">
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Suche nach ISIN, Symbol oder Name..."
+              className={`w-80 pl-4 pr-4 py-2 rounded border ${
+                darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+              } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+            />
+          </div>
+        </div>
         
         {loading ? (
           <div className="text-center py-8">Lädt...</div>
         ) : mappings.length === 0 ? (
           <div className="text-center py-8 text-gray-500">
             Noch keine ISIN Mappings vorhanden. Füge welche hinzu für den CSV-Import!
+          </div>
+        ) : filteredMappings.length === 0 ? (
+          <div className="text-center py-8 text-gray-500">
+            Keine Ergebnisse für "{searchTerm}" gefunden.
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -184,7 +213,7 @@ const ISINVerwaltungView = () => {
                 </tr>
               </thead>
               <tbody>
-                {mappings.map((mapping) => (
+                {filteredMappings.map((mapping) => (
                   <tr
                     key={mapping.id}
                     className={darkMode ? 'border-b border-gray-700' : 'border-b border-gray-200'}

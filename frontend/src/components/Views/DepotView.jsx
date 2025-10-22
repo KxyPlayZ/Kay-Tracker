@@ -1,4 +1,6 @@
 // frontend/src/components/Views/DepotView.jsx
+// OPTIMIERTE VERSION - Aktualisiert NUR Preise, KEIN kompletter Reload!
+
 import React, { useState, useEffect } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
@@ -7,7 +9,7 @@ import PerformanceChart from '../Charts/PerformanceChart';
 import PriceRefreshToggle from '../PriceRefreshToggle';
 
 const DepotView = ({ depot }) => {
-  const { darkMode, aktien, loadData } = useApp();
+  const { darkMode, aktien, setAktien } = useApp(); // setAktien hinzugefügt!
   const [tradeHistory, setTradeHistory] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -23,7 +25,6 @@ const DepotView = ({ depot }) => {
     sum + (parseFloat(a.current_shares || a.shares) * parseFloat(a.buy_price)), 0
   );
   
-  // Punkt 3: Berechne unrealisierte und realisierte Gewinne
   const unrealizedGains = depotValue - depotInvested;
   
   const realizedGains = tradeHistory
@@ -40,7 +41,7 @@ const DepotView = ({ depot }) => {
   const totalValue = depotValue + currentCash;
   const totalReturn = cashStart > 0 ? ((totalValue - cashStart) / cashStart) * 100 : 0;
 
-  // Punkt 7: Funktion zum Laden der Historie
+  // Lade Historie (nur einmal beim Mount)
   const loadHistory = async () => {
     try {
       setLoading(true);
@@ -53,16 +54,59 @@ const DepotView = ({ depot }) => {
     }
   };
 
-  // Punkt 7: Funktion zum Aktualisieren eines einzelnen Preises
+  // 🎯 NEUE FUNKTION: Aktualisiere NUR die Preise (kein kompletter Reload!)
+  const refreshPricesOnly = async () => {
+    try {
+      console.log('🔄 Aktualisiere nur Preise für Depot:', depot.id);
+      
+      // Hole die aktualisierten Aktien vom Server
+      const response = await aktienAPI.getByDepot(depot.id);
+      const updatedAktien = response.data;
+      
+      // Aktualisiere nur die Aktien für dieses Depot im State
+      setAktien(prevAktien => {
+        return prevAktien.map(aktie => {
+          // Finde die aktualisierte Version dieser Aktie
+          const updated = updatedAktien.find(u => u.id === aktie.id);
+          
+          // Wenn gefunden, aktualisiere NUR den current_price
+          if (updated) {
+            return {
+              ...aktie,
+              current_price: updated.current_price
+            };
+          }
+          
+          // Ansonsten behalte die Aktie unverändert
+          return aktie;
+        });
+      });
+      
+      console.log('✅ Preise erfolgreich aktualisiert (ohne Page Reload)');
+    } catch (error) {
+      console.error('❌ Fehler beim Aktualisieren der Preise:', error);
+    }
+  };
+
+  // Einzelnen Preis aktualisieren
   const handleRefreshSinglePrice = async (aktieId) => {
     try {
       const result = await aktienAPI.refreshSinglePrice(aktieId);
       
-      // Lade Daten neu ohne Page Reload
-      await loadData();
-      await loadHistory();
+      // Aktualisiere nur diesen einen Preis im State
+      setAktien(prevAktien => {
+        return prevAktien.map(aktie => {
+          if (aktie.id === aktieId) {
+            return {
+              ...aktie,
+              current_price: result.data.new_price
+            };
+          }
+          return aktie;
+        });
+      });
       
-      alert(`Preis aktualisiert: ${result.data.symbol} - €${result.data.new_price}`);
+      console.log(`✅ Preis aktualisiert: ${result.data.symbol} - €${result.data.new_price}`);
     } catch (error) {
       alert('Fehler beim Aktualisieren des Preises: ' + error.message);
     }
@@ -83,49 +127,36 @@ const DepotView = ({ depot }) => {
           <PerformanceChart darkMode={darkMode} color="#10b981" depotId={depot.id} />
         </div>
 
-        {/* Punkt 3: Erweiterte Zusammenfassung */}
         <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} p-6 rounded-lg shadow-lg`}>
-          <h3 className="text-lg font-semibold mb-4">Zusammenfassung</h3>
-          <div className="space-y-3">
+          <h3 className="text-lg font-semibold mb-4">Depot Übersicht</h3>
+          <div className="space-y-4">
             <div className="flex justify-between">
-              <span className={darkMode ? 'text-gray-400' : 'text-gray-600'}>Cashbestand</span>
-              <span className="font-semibold">€{parseFloat(depot.cash_bestand || 0).toLocaleString('de-DE', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+              <span className={darkMode ? 'text-gray-400' : 'text-gray-600'}>Depotwert</span>
+              <span className="font-semibold">€{depotValue.toFixed(2)}</span>
             </div>
-            
             <div className="flex justify-between">
-              <span className={darkMode ? 'text-gray-400' : 'text-gray-600'}>Investiert</span>
-              <span className="font-semibold">€{depotInvested.toLocaleString('de-DE', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+              <span className={darkMode ? 'text-gray-400' : 'text-gray-600'}>Bargeld</span>
+              <span className="font-semibold">€{currentCash.toFixed(2)}</span>
             </div>
-            
             <div className="flex justify-between">
-              <span className={darkMode ? 'text-gray-400' : 'text-gray-600'}>Aktueller Wert</span>
-              <span className="font-semibold">€{depotValue.toLocaleString('de-DE', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+              <span className={darkMode ? 'text-gray-400' : 'text-gray-600'}>Gesamtwert</span>
+              <span className="font-semibold">€{totalValue.toFixed(2)}</span>
             </div>
-            
-            <div className="flex justify-between pt-2 border-t border-gray-700">
-              <span className={darkMode ? 'text-gray-400' : 'text-gray-600'}>Depotstand (Unrealisiert)</span>
+            <div className="flex justify-between border-t pt-3 mt-3">
+              <span className={darkMode ? 'text-gray-400' : 'text-gray-600'}>Unrealisierter Gewinn</span>
               <span className={`font-semibold ${unrealizedGains >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                {unrealizedGains >= 0 ? '+' : ''}€{unrealizedGains.toLocaleString('de-DE', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                €{unrealizedGains.toFixed(2)}
               </span>
             </div>
-            
             <div className="flex justify-between">
               <span className={darkMode ? 'text-gray-400' : 'text-gray-600'}>Realisierter Gewinn</span>
               <span className={`font-semibold ${realizedGains >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                {realizedGains >= 0 ? '+' : ''}€{realizedGains.toLocaleString('de-DE', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                €{realizedGains.toFixed(2)}
               </span>
             </div>
-            
-            <div className="flex justify-between pt-2 border-t border-gray-700">
+            <div className="flex justify-between">
               <span className={darkMode ? 'text-gray-400' : 'text-gray-600'}>Rendite</span>
               <span className={`font-semibold ${totalReturn >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                {totalReturn.toFixed(2)}%
-              </span>
-            </div>
-            
-            <div className="flex justify-between">
-              <span className={darkMode ? 'text-gray-400' : 'text-gray-600'}>IZF (Intern. Zinsfuß)</span>
-              <span className="font-semibold">
                 {totalReturn.toFixed(2)}%
               </span>
             </div>
@@ -137,13 +168,11 @@ const DepotView = ({ depot }) => {
       <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} p-6 rounded-lg shadow-lg`}>
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-semibold">Aktuelle Trades im Besitz</h3>
+          {/* WICHTIG: Übergebe refreshPricesOnly statt loadData! */}
           <PriceRefreshToggle 
             depotId={depot.id}
             darkMode={darkMode}
-            onPricesUpdated={async () => {
-              await loadData();
-              await loadHistory();
-            }}
+            onPricesUpdated={refreshPricesOnly}
           />
         </div>
         {loading ? (
@@ -184,7 +213,7 @@ const DepotView = ({ depot }) => {
                       </td>
                       <td className="px-4 py-3 text-right">{shares.toFixed(2)}</td>
                       <td className="px-4 py-3 text-right">€{parseFloat(aktie.buy_price).toFixed(2)}</td>
-                      <td className="px-4 py-3 text-right">€{parseFloat(aktie.current_price).toFixed(2)}</td>
+                      <td className="px-4 py-3 text-right font-semibold">€{parseFloat(aktie.current_price).toFixed(2)}</td>
                       <td className={`px-4 py-3 text-right ${gain >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                         €{gain.toFixed(2)} ({gainPercent.toFixed(2)}%)
                       </td>
@@ -250,7 +279,6 @@ const DepotView = ({ depot }) => {
                         })}
                       </td>
                       <td className="px-4 py-3">
-                        {/* Punkt 6: Nur Text, fett, farbig - keine Boxen */}
                         <span className={`font-bold ${isBuy ? 'text-green-500' : 'text-red-500'}`}>
                           {isBuy ? 'KAUF' : 'VERKAUF'}
                         </span>
