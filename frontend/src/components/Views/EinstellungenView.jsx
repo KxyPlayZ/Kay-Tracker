@@ -2,9 +2,11 @@
 import React, { useState } from 'react';
 import { Moon, Sun, Trash2, AlertTriangle } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { useToast } from '../../hooks/useToast';
 
 const EinstellungenView = () => {
   const { darkMode, setDarkMode, depots, deleteDepot, clearDepotData, clearAllUserData } = useApp();
+  const toast = useToast();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteType, setDeleteType] = useState(null);
   const [selectedDepot, setSelectedDepot] = useState(null);
@@ -12,30 +14,31 @@ const EinstellungenView = () => {
   const handleDeleteDepot = async () => {
     try {
       await deleteDepot(selectedDepot);
-      alert('Depot erfolgreich gelöscht!');
+      toast.success('✅ Depot erfolgreich gelöscht!');
       setShowDeleteModal(false);
+      setSelectedDepot(null);
     } catch (error) {
-      alert('Fehler: ' + error.message);
+      toast.error('❌ Fehler: ' + error.message);
     }
   };
 
   const handleClearDepotData = async () => {
     try {
       const result = await clearDepotData(selectedDepot);
-      alert(`${result.deleted_count} Aktien wurden aus dem Depot gelöscht!`);
+      toast.success(`✅ ${result.deleted_count} Aktien wurden aus dem Depot gelöscht!`);
       setShowDeleteModal(false);
     } catch (error) {
-      alert('Fehler: ' + error.message);
+      toast.error('❌ Fehler: ' + error.message);
     }
   };
 
   const handleClearAllData = async () => {
     try {
       const result = await clearAllUserData();
-      alert(`${result.deleted_depots} Depots und ${result.deleted_aktien} Aktien wurden gelöscht!`);
+      toast.success(`✅ ${result.deleted_depots} Depots und ${result.deleted_aktien} Aktien wurden gelöscht!`);
       setShowDeleteModal(false);
     } catch (error) {
-      alert('Fehler: ' + error.message);
+      toast.error('❌ Fehler: ' + error.message);
     }
   };
 
@@ -89,7 +92,7 @@ const EinstellungenView = () => {
             <button
               onClick={() => {
                 if (!selectedDepot) {
-                  alert('Bitte wähle ein Depot aus!');
+                  toast.warning('⚠️ Bitte wähle ein Depot aus!');
                   return;
                 }
                 setDeleteType('clearDepot');
@@ -108,7 +111,7 @@ const EinstellungenView = () => {
             <button
               onClick={() => {
                 if (!selectedDepot) {
-                  alert('Bitte wähle ein Depot aus (oben)!');
+                  toast.warning('⚠️ Bitte wähle ein Depot aus (oben)!');
                   return;
                 }
                 setDeleteType('deleteDepot');
@@ -134,9 +137,9 @@ const EinstellungenView = () => {
                 setDeleteType('clearAll');
                 setShowDeleteModal(true);
               }}
-              className="w-full bg-red-600 text-white py-2 px-4 rounded hover:bg-red-700 transition-colors font-bold"
+              className="w-full bg-red-600 text-white py-2 px-4 rounded hover:bg-red-700 transition-colors font-semibold"
             >
-              Alle Daten löschen
+              ALLE DATEN LÖSCHEN
             </button>
           </div>
         </div>
@@ -145,22 +148,24 @@ const EinstellungenView = () => {
       {/* Bestätigungs-Modal */}
       {showDeleteModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg p-6 w-full max-w-md`}>
+          <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg p-6 max-w-md w-full mx-4`}>
             <div className="flex items-center gap-3 mb-4">
               <AlertTriangle size={32} className="text-red-500" />
-              <h3 className="text-xl font-semibold">Bist du sicher?</h3>
+              <h3 className="text-xl font-bold">Bestätigung erforderlich</h3>
             </div>
-
-            <p className="mb-6 text-gray-600">
-              {deleteType === 'clearDepot' && 'Alle Aktien werden aus dem Depot gelöscht. Das Depot bleibt bestehen.'}
-              {deleteType === 'deleteDepot' && 'Das gesamte Depot inklusive aller Aktien wird unwiderruflich gelöscht!'}
-              {deleteType === 'clearAll' && 'ALLE Depots und Aktien werden gelöscht! Dein Account bleibt bestehen. Diese Aktion kann nicht rückgängig gemacht werden!'}
+            
+            <p className={`mb-6 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+              {deleteType === 'clearDepot' && 'Möchtest du wirklich alle Aktien aus diesem Depot löschen?'}
+              {deleteType === 'deleteDepot' && 'Möchtest du wirklich das gesamte Depot inklusive aller Aktien löschen?'}
+              {deleteType === 'clearAll' && 'Möchtest du wirklich ALLE Depots und Aktien löschen? Diese Aktion kann nicht rückgängig gemacht werden!'}
             </p>
-
+            
             <div className="flex gap-3">
               <button
                 onClick={() => setShowDeleteModal(false)}
-                className={`flex-1 py-2 px-4 rounded ${darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'}`}
+                className={`flex-1 py-2 px-4 rounded transition-colors ${
+                  darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'
+                }`}
               >
                 Abbrechen
               </button>
@@ -170,9 +175,9 @@ const EinstellungenView = () => {
                   else if (deleteType === 'deleteDepot') handleDeleteDepot();
                   else if (deleteType === 'clearAll') handleClearAllData();
                 }}
-                className="flex-1 bg-red-600 text-white py-2 px-4 rounded hover:bg-red-700 font-medium"
+                className="flex-1 bg-red-500 text-white py-2 px-4 rounded hover:bg-red-600 transition-colors font-semibold"
               >
-                Ja, löschen
+                Löschen
               </button>
             </div>
           </div>

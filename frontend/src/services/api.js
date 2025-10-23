@@ -110,12 +110,13 @@ export const importAktien = async (depotId, aktienList) => {
   return response.data;
 };
 
-// JustTrade CSV Import
-export const importJustTradeCSV = async (depotId, aktienData) => {
+// JustTrade CSV Import - AKTUALISIERT MIT import_mode
+export const importJustTradeCSV = async (depotId, aktienData, importMode = 'replace') => {
   try {
     const response = await api.post('/aktien/import/justtrade', {
       depot_id: depotId,
-      aktien: aktienData
+      aktien: aktienData,
+      import_mode: importMode  // NEU: 'replace' oder 'add'
     });
     return response.data;
   } catch (error) {

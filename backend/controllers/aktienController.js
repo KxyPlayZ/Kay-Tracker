@@ -237,7 +237,8 @@ exports.importJustTradeCSV = async (req, res) => {
   const client = await pool.connect();
   
   try {
-    const { depot_id, aktien } = req.body;
+    const { depot_id, aktien, import_mode = 'replace' } = req.body;
+
 
     if (!depot_id || !Array.isArray(aktien) || aktien.length === 0) {
       return res.status(400).json({ error: 'Ungültige Daten' });
@@ -266,25 +267,27 @@ exports.importJustTradeCSV = async (req, res) => {
     }
     
     // SCHRITT 1: Lösche alte CSV-Daten
-    if (csvISINs.size > 0) {
+    if (import_mode === 'replace' && csvISINs.size > 0) {
       const isinArray = Array.from(csvISINs);
       
       await client.query(
         `DELETE FROM transactions 
-         WHERE aktie_id IN (
-           SELECT id FROM aktien 
-           WHERE depot_id = $1 AND isin = ANY($2)
-         )`,
+        WHERE aktie_id IN (
+          SELECT id FROM aktien 
+          WHERE depot_id = $1 AND isin = ANY($2)
+        )`,
         [depot_id, isinArray]
       );
       
       await client.query(
         `DELETE FROM aktien 
-         WHERE depot_id = $1 AND isin = ANY($2)`,
+        WHERE depot_id = $1 AND isin = ANY($2)`,
         [depot_id, isinArray]
       );
       
-      console.log(`✓ Alte CSV-Daten gelöscht für ${isinArray.length} ISINs`);
+      console.log(`✓ Alte CSV-Daten gelöscht für ${isinArray.length} ISINs (Replace-Modus)`);
+    } else if (import_mode === 'add') {
+      console.log('✓ Add-Modus: Bestehende Daten werden beibehalten');
     }
     
     // SCHRITT 2: Gruppiere Transaktionen nach ISIN

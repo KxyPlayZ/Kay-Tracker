@@ -2,12 +2,14 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Edit2, Save, X } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { useToast } from '../../hooks/useToast';
 import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 const ISINVerwaltungView = () => {
   const { darkMode } = useApp();
+  const toast = useToast();
   const [mappings, setMappings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState(null);
@@ -32,7 +34,7 @@ const ISINVerwaltungView = () => {
       setMappings(response.data);
     } catch (error) {
       console.error('Fehler beim Laden der ISIN Mappings:', error);
-      alert('Fehler beim Laden der ISIN Mappings');
+      toast.error('❌ Fehler beim Laden der ISIN Mappings');
     } finally {
       setLoading(false);
     }
@@ -54,9 +56,9 @@ const ISINVerwaltungView = () => {
       setFormData({ isin: '', symbol: '', name: '' });
       setShowAddForm(false);
       loadMappings();
-      alert('ISIN Mapping erfolgreich hinzugefügt!');
+      toast.success('✅ ISIN Mapping erfolgreich hinzugefügt!');
     } catch (error) {
-      alert('Fehler: ' + (error.response?.data?.error || error.message));
+      toast.error('❌ Fehler: ' + (error.response?.data?.error || error.message));
     }
   };
 
@@ -70,9 +72,9 @@ const ISINVerwaltungView = () => {
       );
       setEditingId(null);
       loadMappings();
-      alert('ISIN Mapping aktualisiert!');
+      toast.success('✅ ISIN Mapping aktualisiert!');
     } catch (error) {
-      alert('Fehler: ' + (error.response?.data?.error || error.message));
+      toast.error('❌ Fehler: ' + (error.response?.data?.error || error.message));
     }
   };
 
@@ -86,9 +88,9 @@ const ISINVerwaltungView = () => {
         getAuthHeader()
       );
       loadMappings();
-      alert('ISIN Mapping gelöscht!');
+      toast.success('✅ ISIN Mapping gelöscht!');
     } catch (error) {
-      alert('Fehler: ' + (error.response?.data?.error || error.message));
+      toast.error('❌ Fehler: ' + (error.response?.data?.error || error.message));
     }
   };
 

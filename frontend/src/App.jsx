@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Plus } from 'lucide-react';
 import { useApp } from './context/AppContext';
+import { useToast } from './hooks/useToast';
 import Sidebar from './components/Layout/Sidebar';
 import Header from './components/Layout/Header';
 import UebersichtView from './components/Views/UebersichtView';
@@ -10,11 +11,13 @@ import MarktView from './components/Views/MarktView';
 import EinstellungenView from './components/Views/EinstellungenView';
 import ISINVerwaltungView from './components/Views/ISINVerwaltungView';
 import AddModal from './components/Modals/AddModal';
+import ToastContainer from './components/Notifications/ToastContainer';
 import Login from './components/Auth/Login';
 import './styles/App.css';
 
 function App() {
-  const { darkMode, user, loading, depots, aktien } = useApp();  // <-- aktien hinzugefügt!
+  const { darkMode, user, loading, depots, aktien } = useApp();
+  const toast = useToast();
   const [activeView, setActiveView] = useState('uebersicht');
   const [selectedDepot, setSelectedDepot] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -36,6 +39,9 @@ function App() {
 
   return (
     <div className={`min-h-screen ${darkMode ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-900'}`}>
+      {/* Toast Container */}
+      <ToastContainer toasts={toast.toasts} removeToast={toast.removeToast} />
+      
       <div className="flex">
         <Sidebar 
           activeView={activeView}
@@ -92,6 +98,7 @@ function App() {
               depots={depots}
               aktien={aktien}
               darkMode={darkMode}
+              toast={toast}
             />
           )}
         </div>
